@@ -98,10 +98,12 @@ async function loadDataset(){
     const [cRes,mRes] = await Promise.allSettled([loadCSV(p.cutoff),loadCSV(p.movement)]);
     const c = cRes.status === "fulfilled" ? cRes.value : [];
     const m = mRes.status === "fulfilled" ? mRes.value : [];
-    state.allotments=a; state.cutoffs=c; state.movement=m; state.loaded=true;
+    state.allotments=normalizeDataset(a); state.cutoffs=c.map(normalizeRecord); state.movement=m.map(normalizeRecord); state.loaded=true;
     setRoundOptions(a);
     populateRankStateOptions();
     populateRankCourseOptions();
+    populateCollegeOptions();
+    populateCourseDatalist();
     setCategoryOptions();
     document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
     document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
@@ -127,7 +129,7 @@ const COLLEGE_STATES = [
 function deriveCollegeState(x){
   const sourceState=String(x.state||"").trim();
   if(state.counselling!=="AIQ" && sourceState && sourceState!=="All India") return sourceState;
-  const t=norm(x.college||"");
+  const t=norm(x._college||x.college||"");
   const aliases=[
     ["ANDAMAN AND NICOBAR ISLANDS","Andaman & Nicobar Islands"],["ANDHRA PRADESH","Andhra Pradesh"],["ARUNACHAL PRADESH","Arunachal Pradesh"],["ASSAM","Assam"],["BIHAR","Bihar"],["CHANDIGARH","Chandigarh"],["CHHATTISGARH","Chhattisgarh"],["DELHI","Delhi"],["NEW DELHI","Delhi"],["GOA","Goa"],["GUJARAT","Gujarat"],["HARYANA","Haryana"],["HIMACHAL PRADESH","Himachal Pradesh"],["JAMMU AND KASHMIR","Jammu & Kashmir"],["JAMMU KASHMIR","Jammu & Kashmir"],["JHARKHAND","Jharkhand"],["KARNATAKA","Karnataka"],["KERALA","Kerala"],["LADAKH","Ladakh"],["LAKSHADWEEP","Lakshadweep"],["MADHYA PRADESH","Madhya Pradesh"],["MAHARASHTRA","Maharashtra"],["MANIPUR","Manipur"],["MEGHALAYA","Meghalaya"],["MIZORAM","Mizoram"],["NAGALAND","Nagaland"],["ODISHA","Odisha"],["ORISSA","Odisha"],["PUDUCHERRY","Puducherry"],["PONDICHERRY","Puducherry"],["PUNJAB","Punjab"],["RAJASTHAN","Rajasthan"],["SIKKIM","Sikkim"],["TAMIL NADU","Tamil Nadu"],["TELANGANA","Telangana"],["TRIPURA","Tripura"],["UTTAR PRADESH","Uttar Pradesh"],["UTTARAKHAND","Uttarakhand"],["WEST BENGAL","West Bengal"]
   ];
@@ -135,47 +137,155 @@ function deriveCollegeState(x){
   return "";
 }
 
-// The PDF extraction can occasionally shift college text into the course column.
-// Keep only course-like labels here; preserve the exact source wording for values
-// that pass the check. This prevents entries such as K.M.C. KATIHAR or N.M.C. PATNA
-// from appearing in the Course dropdown.
-const BARE_PG_COURSES = new Set([
-  "ANAESTHESIOLOGY","ANATOMY","BIOCHEMISTRY","COMMUNITY MEDICINE","DERMATOLOGY",
-  "E N T","E.N.T.","ENT","F.M.T.","FMT","FORENSIC MEDICINE","GENERAL MEDICINE",
-  "GENERAL SURGERY","GERIATRICS","MICROBIOLOGY","MEDICINE","NUCLEAR MEDICINE",
-  "OBS & GYNAE","OBSTETRICS & GYNAECOLOGY","OBSTETRICS AND GYNAECOLOGY",
-  "OPHTHALMOLOGY","ORTHOPAEDICS","PAEDIATRICS","PATHOLOGY","PHARMACOLOGY",
-  "PHYSIOLOGY","PSYCHIATRY","RADIO ONCOLOGY","RADIODIAGNOSIS","RADIO DIAGNOSIS",
-  "RADIOLOGY","RESPIRATORY MEDICINE","PULMONARY MEDICINE","PHY.MED.& REHAB.",
-  "PHYSICAL MEDICINE & REHABILITATION","TB & CHEST","TRANSFUSION MEDICINE",
-  "TROPICAL MEDICINE","VENEREOLOGY","SOCIAL & PREVENTIVE MEDICINE / COMMUNITY MEDICINE"
-].map(x=>norm(x)));
+// ---- Clean master fields -------------------------------------------------
+// The source PDFs are not uniform: some rows have college/course columns shifted,
+// some course labels contain NBEMS/diploma prefixes, and some college cells contain
+// addresses or email IDs. We create clean candidate-facing fields without changing
+// the original source columns.
+const COURSE_PATTERNS = [
+  ["MD - General Medicine", /GENERAL\s+MEDICINE/],
+  ["MS - General Surgery", /GENERAL\s+SURGERY/],
+  ["MD - Anaesthesiology", /ANAESTHESIO|ANAESTHESIA/],
+  ["MD - Paediatrics", /PAEDIATRIC|PEDIATRIC/],
+  ["MS - Orthopaedics", /ORTHOPAED|ORTHOPED/],
+  ["MD - Radio Diagnosis / Radiology", /RADIO\s*[- ]?DIAGNOSIS|RADIODIAGNOS|RADIOLOGY/],
+  ["MS - Obstetrics & Gynaecology", /OBSTETRICS?\s*(AND|&)\s*GYNAE|OBST\.\s*&\s*GYNAE|GYNAECOLOGY/],
+  ["MD - Dermatology", /DERMATOLOGY|DERM\.?\s*,?\s*VENE|SKIN\s*(AND|&)\s*V\.?D/],
+  ["MS - Ophthalmology", /OPHTHALMOLOGY/],
+  ["MS - ENT", /OTORHINOLARYNG|\bENT\b|E\.N\.T\./],
+  ["MD - Pathology", /PATHOLOGY/],
+  ["MD - Microbiology", /MICROBIOLOGY/],
+  ["MD - Pharmacology", /PHARMACOLOGY/],
+  ["MD - Physiology", /PHYSIOLOGY/],
+  ["MD - Psychiatry", /PSYCHIATRY/],
+  ["MD - Community Medicine", /COMMUNITY\s+MEDICINE|SOCIAL\s*&?\s*PREVENTIVE\s*MEDICINE|\bPSM\b/],
+  ["MD - Forensic Medicine", /FORENSIC\s+MEDICINE|\bFMT\b/],
+  ["MD - Anatomy", /\bANATOMY\b/],
+  ["MD - Biochemistry", /BIO[- ]?CHEMISTRY|BIOCHEMISTRY/],
+  ["MD - Emergency Medicine", /EMERGENCY\s+MEDICINE/],
+  ["MD - Respiratory / Pulmonary Medicine", /RESPIRATORY\s+MEDICINE|PULMONARY\s+MEDICINE|TB\s*&?\s*CHEST/],
+  ["MD - Nuclear Medicine", /NUCLEAR\s+MEDICINE/],
+  ["MD - Psychiatry", /PSYCHIATRY/],
+  ["MD - Transfusion Medicine", /TRANSFUSION\s+MEDICINE|IMMUNO.*HAEMATOLOGY.*BLOOD\s+TRANSFUSION|BLOOD\s+TRANSFUSION/],
+  ["MD - Radiotherapy", /RADIOTHERAPY|RADIATION\s*ONCOLOGY/],
+  ["MD - Physical Medicine & Rehabilitation", /PHYSICAL\s+MEDICINE|PHY\.?\s*MED|REHAB/],
+  ["MD - Geriatrics", /GERIATRIC/],
+  ["MD - Tropical Medicine", /TROPICAL\s+MEDICINE/],
+  ["MD - Venereology", /VENEREOLOGY/],
+  ["MS - Neurosurgery", /NEURO\s*SURGERY/],
+  ["MS - Traumatology & Surgery", /TRAUMATOLOGY\s*(AND|&)\s*SURGERY/],
+  ["DNB - General Medicine", /DNB.*GENERAL\s+MEDICINE/],
+  ["DNB - General Surgery", /DNB.*GENERAL\s+SURGERY/],
+  ["Diploma - Anaesthesia", /DIPLOMA.*ANAESTH/],
+  ["Diploma - Paediatrics", /DIPLOMA.*PAEDIATR|DCH/],
+  ["Diploma - Ophthalmology", /DIPLOMA.*OPHTHAL/],
+  ["Diploma - ENT", /DIPLOMA.*OTO[- ]?RHINO|DIPLOMA.*ENT/],
+  ["Diploma - Pathology", /DIPLOMA.*PATHOLOGY/],
+  ["Diploma - Radio Diagnosis", /DIPLOMA.*RADIO/],
+  ["Diploma - Obstetrics & Gynaecology", /DIPLOMA.*OBST.*GYNAE|DGO/],
+  ["Diploma - Dermatology", /DIPLOMA.*DERMATOLOGY/],
+  ["Diploma - Orthopaedics", /DIPLOMA.*ORTHOP/],
+  ["Diploma - Psychiatry", /DIPLOMA.*PSYCHIATRY/],
+  ["Diploma - Community Medicine", /DIPLOMA.*COMMUNITY|DIPLOMA.*PUBLIC\s+HEALTH|PSM/],
+  ["Diploma - Forensic Medicine", /DIPLOMA.*FORENSIC/],
+  ["Diploma - Microbiology", /DIPLOMA.*MICROBIOLOGY/],
+  ["Diploma - Pharmacology", /DIPLOMA.*PHARMACOLOGY/]
+];
 
-function isCourseLike(value){
-  const raw=String(value||"").trim();
-  const n=norm(raw);
-  if(!n || raw.length>90) return false;
-  if(BARE_PG_COURSES.has(n)) return true;
-
-  // Degree/diploma nomenclature used by NMC/MCC datasets.
-  const degreePrefix=/^(MD|MS|DNB|DM|MCH|DIPLOMA|PG DIPLOMA|MD MS|MD MS)\b/;
-  if(degreePrefix.test(n)) {
-    // Reject obvious extraction spillovers: college/institution text, rank/category
-    // phrases, or multiple unrelated course blocks in one cell.
-    if(/\b(COLLEGE|INSTITUTE|HOSPITAL|AGAINST|CATEGORY SEAT|JUMP OVER|COMPENSATION SEAT|NBEMS).{0,40}\b/.test(n)) return false;
-    if((n.match(/\bMD\b/g)||[]).length>1 || (n.match(/\bMS\b/g)||[]).length>1) return false;
-    return true;
+function canonicalCourse(...values){
+  const raws=values.map(v=>String(v||"").trim()).filter(Boolean);
+  if(!raws.length) return "";
+  // Prefer a value that actually looks like a course over a seat/remarks string.
+  const scored=raws.map(raw=>{
+    const n=norm(raw);
+    let score=0;
+    if(/AGAINST|JUMP OVER|CATEGORY SEAT|ALLOTTED|NOT ALLOTTED|VACANCY|FRESH ALLOTMENT/.test(n)) score-=100;
+    if(/MD|MS|DNB|DIPLOMA|ANAESTH|MEDICINE|SURGERY|PAEDIATR|PATHOLOGY|MICROBIOLOGY|RADIO|ORTHOP|OPHTHAL|GYNAE|DERMAT/.test(n)) score+=10;
+    if(raw.length>140) score-=20;
+    return {raw,n,score};
+  }).sort((a,b)=>b.score-a.score);
+  for(const c of scored){
+    for(const [label,re] of COURSE_PATTERNS){
+      if(re.test(c.n)){
+        // If a combined course explicitly contains a named degree, keep the most
+        // useful broad PG label rather than the noisy PDF variant.
+        return label;
+      }
+    }
   }
-  return false;
+  return "";
+}
+
+function cleanCollegeName(value){
+  let s=String(value||"").replace(/\uFEFF/g,"").trim();
+  if(!s) return "";
+  s=s.replace(/[\u2013\u2014]/g,"-").replace(/\s+/g," ");
+  s=s.replace(/\b[\w.+-]+@[\w.-]+\.[A-Z]{2,}\b/ig,"");
+  s=s.replace(/\[[^\]]*\]/g,"");
+  s=s.replace(/\b(CO-?EDUCATION|CO EDUCATION|PRIVATE|GOVT\.?|GOVERNMENT)\b/ig,"");
+  s=s.replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/g,"");
+  s=s.replace(/\b\d{6}\b/g,"");
+  s=s.replace(/\s+/g," ").replace(/^[-,\s]+|[-,\s]+$/g,"");
+  const n=norm(s);
+  if(!n || /^(NOT ALLOTTED|ALLOTTED|GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC|AGAINST|JUMP OVER)/.test(n)) return "";
+  // Stop at obvious address/contact fragments for AIQ-style cells.
+  const parts=s.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length>1){
+    let acc=[];
+    for(const p of parts){
+      const pn=norm(p);
+      if(/@|\b(?:ROAD|MARG|SALAI|NAGAR|PLACE|DISTRICT|PIN|ZIP)\b|\b\d{6}\b/.test(pn)) break;
+      acc.push(p);
+      if(/MEDICAL\s+COLLEGE|MEDICAL\s+UNIVERSITY|MEDICAL\s+INSTITUTE|INSTITUTE\s+OF\s+MEDICAL|PGIMER|AIIMS/.test(norm(acc.join(" ")))) break;
+      if(acc.length>=3) break;
+    }
+    if(acc.length) s=acc.join(", ");
+  }
+  s=s.replace(/\s{2,}/g," ").trim();
+  if(s.length<3 || s.length>160) return "";
+  return s;
+}
+
+function normalizeRecord(x){
+  const rawCollege=String(x.college||"");
+  const rawCourse=String(x.course||"");
+  const course=canonicalCourse(rawCourse,rawCollege);
+  const collegeA=cleanCollegeName(rawCollege);
+  const collegeB=cleanCollegeName(rawCourse);
+  // Bihar and a few state extracts can have the two fields shifted. If the college
+  // field is clearly a course and the course field clearly looks like a remark,
+  // do not expose either as a college. The clean college remains blank until the
+  // underlying source has a valid institute value.
+  let college=collegeA;
+  if(!college && collegeB && !canonicalCourse(rawCollege)) college=collegeB;
+  return {...x,_college:college,_course:course};
+}
+
+function normalizeDataset(rows){ return rows.map(normalizeRecord); }
+
+function isCollegeLike(v){ return !!cleanCollegeName(v); }
+
+function populateCollegeOptions(){
+  const list=document.getElementById("collegeOptions");
+  if(!list) return;
+  const vals=[...new Set(state.allotments.map(x=>x._college).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
+  list.innerHTML=vals.map(v=>`<option value="${esc(v)}"></option>`).join("");
+}
+
+function populateCourseDatalist(){
+  const list=document.getElementById("courseOptions");
+  if(!list) return;
+  const vals=[...new Set(state.allotments.map(x=>x._course).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
+  list.innerHTML=vals.map(v=>`<option value="${esc(v)}"></option>`).join("");
 }
 
 function populateRankCourseOptions(){
   const sel=document.getElementById("rankCourse");
   if(!sel) return;
   const previous=sel.value;
-  const courses=[...new Set(currentAllotments()
-    .map(x=>String(x.course||"").trim())
-    .filter(isCourseLike))]
+  const courses=[...new Set(currentAllotments().map(x=>x._course).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
   sel.innerHTML=`<option value="">All courses</option>` + courses.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
   sel.value=courses.includes(previous)?previous:"";
@@ -211,15 +321,15 @@ function runRank(){
   const college=norm(document.getElementById("rankCollege").value);
   const category=document.getElementById("rankCategory").value;
   let source=rankFilteredAllotments();
-  if(course) source=source.filter(x=>norm(x.course).includes(course));
-  if(college) source=source.filter(x=>norm(x.college).includes(college));
+  if(course) source=source.filter(x=>x._course===document.getElementById("rankCourse").value);
+  if(college) source=source.filter(x=>norm(x._college||"").includes(college));
 
   // Derive observed closing AIR from the selected round's actual allotments.
   // This keeps category/state filters tied to the same round instead of mixing rounds.
   const groups=new Map();
   for(const x of source){
     const cat=cleanCategory(x.category) || "OTHER";
-    const key=category==="ALL" ? `${x.college}|${x.course}|${cat}` : `${x.college}|${x.course}`;
+    const key=category==="ALL" ? `${x._college}|${x._course}|${cat}` : `${x._college}|${x._course}`;
     const rank=Number(x.rank_value);
     const prev=groups.get(key);
     if(!prev || rank>prev.closing_rank){ groups.set(key,{...x,closing_rank:rank,category_clean:cat,allotment_count:1}); }
@@ -244,8 +354,8 @@ function runRank(){
     const close=Number(x.closing_rank), buffer=close-air;
     return `<article class="rank-item">
       <span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span>
-      <h4>${esc(x.course||"Course not available")}</h4>
-      <p>${esc(x.college||"Institute not available")}${deriveCollegeState(x)?` · ${esc(deriveCollegeState(x))}`:""}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p>
+      <h4>${esc(x._course||"Course not available")}</h4>
+      <p>${esc(x._college||"Institute not available")}${deriveCollegeState(x)?` · ${esc(deriveCollegeState(x))}`:""}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p>
       <div class="rank-metrics">
         <div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div>
         <div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div>
@@ -261,13 +371,13 @@ function runExplore(){
   const course=norm(document.getElementById("searchCourse").value);
   const maxAir=Number(document.getElementById("searchMaxAir").value)||Infinity;
   let rows=currentAllotments().filter(x=>Number(x.rank_value)<=maxAir);
-  if(college) rows=rows.filter(x=>norm(x.college).includes(college));
-  if(course) rows=rows.filter(x=>norm(x.course).includes(course));
+  if(college) rows=rows.filter(x=>norm(x._college||"").includes(college));
+  if(course) rows=rows.filter(x=>norm(x._course||"").includes(course));
   rows.sort((a,b)=>Number(a.rank_value)-Number(b.rank_value));
   rows=rows.slice(0,250);
   document.getElementById("exploreMeta").textContent=`${fmt(rows.length)} records shown · max 250`;
   document.getElementById("exploreBody").innerHTML=rows.length?rows.map(x=>`<tr>
-    <td>${fmt(x.rank_value)}</td><td>${esc(x.college)}</td><td>${esc(x.course)}</td>
+    <td>${fmt(x.rank_value)}</td><td>${esc(x._college||"—")}</td><td>${esc(x._course||"—")}</td>
     <td>${esc(x.category)}</td><td>${esc(x.quota)}</td><td>${esc(x.seat_type)}</td>
   </tr>`).join(""):`<tr><td colspan="6">No records found for the selected filters.</td></tr>`;
 }
@@ -279,7 +389,7 @@ function clearExplore(){
 function runMovement(){
   const college=norm(document.getElementById("moveCollege").value);
   const course=norm(document.getElementById("moveCourse").value);
-  let rows=state.movement.filter(x=>(!college||norm(x.college).includes(college))&&(!course||norm(x.course).includes(course)));
+  let rows=state.movement.filter(x=>(!college||norm(x._college||"").includes(college))&&(!course||norm(x._course||"").includes(course)));
   if(!rows.length){
     document.getElementById("movementResults").hidden=true;
     document.getElementById("movementEmpty").textContent="No matching historical movement found. Try a broader college or course name.";
@@ -288,7 +398,7 @@ function runMovement(){
   const x=rows[0];
   document.getElementById("movementEmpty").hidden=true;
   document.getElementById("movementResults").hidden=false;
-  document.getElementById("movementTitle").textContent=`${x.college} · ${x.course}`;
+  document.getElementById("movementTitle").textContent=`${x._college||"Institute not available"} · ${x._course||"Course not available"}`;
   const rounds=[["R1","Round 1"],["R2","Round 2"],["R3","Round 3"],["STRAY","Stray"]];
   document.getElementById("movementRow").innerHTML=rounds.map(([r,label])=>{
     const o=x[`opening_rank_${r}`], c=x[`closing_rank_${r}`];
@@ -307,6 +417,8 @@ document.getElementById("round").addEventListener("change",e=>{
   state.round=e.target.value;
   populateRankStateOptions();
   populateRankCourseOptions();
+  populateCollegeOptions();
+  populateCourseDatalist();
   document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
   clearExplore();
 });

@@ -85,7 +85,7 @@
       </label>
       <label>
         <span>College <em>optional</em></span>
-        <input id="rankCollege" placeholder="e.g. AIIMS">
+        <input id="rankCollege" list="collegeOptions" placeholder="Start typing a college">
       </label>
       <button id="rankSearch" class="primary">Find my historical range <b>→</b></button>
     </div>
@@ -126,11 +126,11 @@
     <div class="explore-controls">
       <label>
         <span>College / Institute</span>
-        <input id="searchCollege" placeholder="Start typing a college">
+        <input id="searchCollege" list="collegeOptions" placeholder="Start typing a college">
       </label>
       <label>
         <span>Specialty / Course</span>
-        <input id="searchCourse" placeholder="e.g. MD Medicine">
+        <input id="searchCourse" list="courseOptions" placeholder="Start typing a course">
       </label>
       <label>
         <span>Maximum AIR</span>
@@ -174,8 +174,8 @@
 
   <div class="movement-card">
     <div class="movement-controls">
-      <label><span>College / Institute</span><input id="moveCollege" placeholder="e.g. AIIMS"></label>
-      <label><span>Course</span><input id="moveCourse" placeholder="e.g. General Medicine"></label>
+      <label><span>College / Institute</span><input id="moveCollege" list="collegeOptions" placeholder="Start typing a college"></label>
+      <label><span>Course</span><input id="moveCourse" list="courseOptions" placeholder="Start typing a course"></label>
       <button id="moveSearch" class="secondary">Show movement</button>
     </div>
     <div id="movementEmpty" class="movement-empty">Enter a college or course to compare observed opening and closing AIR across rounds.</div>
@@ -195,6 +195,9 @@
     </div>
   </div>
 </section>
+  <datalist id="collegeOptions"></datalist>
+  <datalist id="courseOptions"></datalist>
+
 </main>
 
 <footer>SeatMentor · 2025 counselling intelligence · Historical data explorer</footer>
