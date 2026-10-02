@@ -9,6 +9,23 @@ const PATHS = {
 
 const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], loaded:false };
 
+const CATEGORY_OPTIONS = [
+  ["ALL","All categories"], ["GENERAL","General / UR"], ["OBC","OBC"],
+  ["SC","SC"], ["ST","ST"], ["EWS","EWS"], ["NRI","NRI"]
+];
+
+function cleanCategory(value){
+  const s = norm(value);
+  if(!s) return "";
+  if(s === "GENERAL" || s === "GEN" || s === "UR" || s.startsWith("UR ") || s.startsWith("UROP") || s.startsWith("URPH")) return "GENERAL";
+  if(s === "OBC" || s === "BC" || s.startsWith("BCOP") || s.startsWith("BCPH") || s === "EBC") return "OBC";
+  if(s === "SC" || s.startsWith("SCOP") || s.startsWith("SCPH")) return "SC";
+  if(s === "ST" || s.startsWith("STOP")) return "ST";
+  if(s === "EWS" || s.startsWith("EWOP") || s.startsWith("EWPH")) return "EWS";
+  if(s === "NRI" || s.includes(" NRI ") || s.endsWith(" NRI")) return "NRI";
+  return "";
+}
+
 function parseCSV(text){
   const rows=[]; let row=[], cell="", quoted=false;
   for(let i=0;i<text.length;i++){
@@ -59,9 +76,15 @@ async function loadDataset(){
   document.getElementById("rankDataStatus").textContent="Loading…";
   document.getElementById("exploreStatus").textContent="Loading…";
   try{
-    const [a,c,m]=await Promise.all([loadCSV(p.allotment),loadCSV(p.cutoff),loadCSV(p.movement)]);
+    // Allotment is the core source for My Rank. Cutoff/movement are optional so
+    // one missing auxiliary CSV cannot break the whole GitHub Pages app.
+    const a = await loadCSV(p.allotment);
+    const [cRes,mRes] = await Promise.allSettled([loadCSV(p.cutoff),loadCSV(p.movement)]);
+    const c = cRes.status === "fulfilled" ? cRes.value : [];
+    const m = mRes.status === "fulfilled" ? mRes.value : [];
     state.allotments=a; state.cutoffs=c; state.movement=m; state.loaded=true;
     setRoundOptions(a);
+    populateRankStateOptions();
     document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
     document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
     document.getElementById("rankEmpty").hidden=false;
@@ -70,8 +93,23 @@ async function loadDataset(){
   }catch(e){
     console.error(e);
     document.getElementById("rankDataStatus").textContent="Data load error";
-    document.getElementById("exploreStatus").textContent="Check data path";
+    document.getElementById("exploreStatus").textContent=`Could not load ${p.allotment}`;
   }
+}
+
+function populateRankStateOptions(){
+  const sel=document.getElementById("rankState");
+  const values=[...new Set(currentAllotments().map(x=>String(x.state||"").trim()).filter(Boolean))].sort();
+  sel.innerHTML=`<option value="ALL">All states</option>` + values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+}
+
+function rankFilteredAllotments(){
+  const selectedState=document.getElementById("rankState").value;
+  const selectedCategory=document.getElementById("rankCategory").value;
+  let rows=currentAllotments();
+  if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>String(x.state||"").trim()===selectedState);
+  if(selectedCategory && selectedCategory!=="ALL") rows=rows.filter(x=>cleanCategory(x.category)===selectedCategory);
+  return rows.filter(x=>Number(x.rank_value)>0 && x.college && x.course);
 }
 
 function currentAllotments(){
@@ -82,41 +120,53 @@ function currentCutoffs(){
 }
 
 function runRank(){
+  if(!state.loaded){return;}
   const air=Number(document.getElementById("myRank").value);
   if(!air || air<1){document.getElementById("myRank").focus();return}
   const course=norm(document.getElementById("rankCourse").value);
   const college=norm(document.getElementById("rankCollege").value);
-  let rows=currentCutoffs().filter(x=>Number(x.closing_rank)>=air);
-  if(course) rows=rows.filter(x=>norm(x.course).includes(course));
-  if(college) rows=rows.filter(x=>norm(x.college).includes(college));
-  rows.sort((a,b)=>Number(a.closing_rank)-Number(b.closing_rank));
-  const unique=[]; const seen=new Set();
-  for(const x of rows){
-    const key=`${x.college}|${x.course}`;
-    if(seen.has(key))continue;
-    seen.add(key); unique.push(x);
-    if(unique.length>=60)break;
+  const category=document.getElementById("rankCategory").value;
+  let source=rankFilteredAllotments();
+  if(course) source=source.filter(x=>norm(x.course).includes(course));
+  if(college) source=source.filter(x=>norm(x.college).includes(college));
+
+  // Derive observed closing AIR from the selected round's actual allotments.
+  // This keeps category/state filters tied to the same round instead of mixing rounds.
+  const groups=new Map();
+  for(const x of source){
+    const cat=cleanCategory(x.category) || "OTHER";
+    const key=category==="ALL" ? `${x.college}|${x.course}|${cat}` : `${x.college}|${x.course}`;
+    const rank=Number(x.rank_value);
+    const prev=groups.get(key);
+    if(!prev || rank>prev.closing_rank){ groups.set(key,{...x,closing_rank:rank,category_clean:cat,allotment_count:1}); }
+    else prev.allotment_count++;
   }
+  let rows=[...groups.values()].filter(x=>x.closing_rank>=air);
+  rows.sort((a,b)=>a.closing_rank-b.closing_rank);
+  rows=rows.slice(0,60);
+
   document.getElementById("rankEmpty").hidden=true;
   document.getElementById("rankResults").hidden=false;
+  const stateLabel=document.getElementById("rankState").selectedOptions[0]?.textContent||"All states";
+  const categoryLabel=document.getElementById("rankCategory").selectedOptions[0]?.textContent||"All categories";
   document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
-  document.getElementById("rankResultCount").textContent=`${fmt(unique.length)} historical matches`;
+  document.getElementById("rankResultCount").textContent=`${fmt(rows.length)} historical matches · ${stateLabel} · ${categoryLabel}`;
   const grid=document.getElementById("rankGrid");
-  if(!unique.length){
-    grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty or college filter, or choose another round.</p></div>`;
+  if(!rows.length){
+    grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty, college, state or category filter, or choose another round.</p></div>`;
     return;
   }
-  grid.innerHTML=unique.map(x=>{
+  grid.innerHTML=rows.map(x=>{
     const close=Number(x.closing_rank), buffer=close-air;
     return `<article class="rank-item">
       <span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span>
       <h4>${esc(x.course||"Course not available")}</h4>
-      <p>${esc(x.college||"Institute not available")}</p>
+      <p>${esc(x.college||"Institute not available")}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p>
       <div class="rank-metrics">
         <div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div>
         <div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div>
         <div class="metric"><small>Historical buffer</small><strong class="buffer">${buffer>=0?"+":""}${fmt(buffer)}</strong></div>
-        <div class="metric"><small>Allotments</small><strong>${fmt(x.allotment_count)}</strong></div>
+        <div class="metric"><small>Observed allotments</small><strong>${fmt(x.allotment_count)}</strong></div>
       </div>
     </article>`;
   }).join("");
@@ -171,9 +221,12 @@ document.getElementById("counselling").addEventListener("change",async e=>{
 });
 document.getElementById("round").addEventListener("change",e=>{
   state.round=e.target.value;
+  populateRankStateOptions();
   document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
   clearExplore();
 });
+document.getElementById("rankState").addEventListener("change",()=>{});
+document.getElementById("rankCategory").addEventListener("change",()=>{});
 document.getElementById("rankSearch").addEventListener("click",runRank);
 document.getElementById("exploreSearch").addEventListener("click",runExplore);
 document.getElementById("moveSearch").addEventListener("click",runMovement);
