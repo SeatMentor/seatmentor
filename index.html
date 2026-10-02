@@ -3,173 +3,119 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SeatMentor — Counselling Insights</title>
-  <meta name="description" content="SeatMentor turns counselling PDFs into searchable seat and allotment insights.">
+  <title>SeatMentor — PG Counselling Intelligence</title>
+  <meta name="description" content="Explore PG counselling seat matrices, allotments and rank insights.">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">Seat<span>Mentor</span></div>
+  <a class="brand" href="#top">Seat<span>Mentor</span></a>
   <nav>
-    <a href="#dashboard">Dashboard</a>
-    <a href="#seat-matrix">Seat Matrix</a>
-    <a href="#allotments">Allotments</a>
+    <a class="active" href="#dashboard">Dashboard</a>
+    <a href="#explorer">Explore Seats</a>
+    <a href="#insights">Insights</a>
     <a href="#about">About</a>
   </nav>
+  <div class="top-actions"><span class="live-dot"></span><span>2025 Data</span></div>
 </header>
 
-<main id="dashboard">
-  <section class="hero">
-    <div>
-      <p class="eyebrow">PG Counselling Analytics</p>
-      <h1>Turn counselling PDFs<br><span>into useful insights.</span></h1>
-      <p class="sub">Search seat matrices, explore allotments and understand rank trends — all in one place.</p>
-      <a class="cta" href="#seat-matrix">Explore data ↓</a>
+<main id="top">
+  <section class="hero" id="dashboard">
+    <div class="hero-copy">
+      <p class="eyebrow">PG COUNSELLING INTELLIGENCE</p>
+      <h1>Find the seat.<br><span>Understand the trend.</span></h1>
+      <p class="hero-sub">A simpler way to explore seat matrices, allotment results and counselling insights — without digging through PDFs.</p>
+    </div>
+
+    <div class="control-panel">
+      <div class="panel-title">
+        <div><span class="step">01</span><strong>Select counselling</strong></div>
+        <span class="panel-hint">Start here</span>
+      </div>
+      <div class="global-filters">
+        <label><span>Counselling</span><select id="globalCounselling"><option value="AIQ">All India Quota (AIQ)</option><option value="BIHAR">Bihar PGMAC</option></select></label>
+        <label><span>Year</span><select id="globalYear"><option value="2025">2025</option></select></label>
+        <label><span>Round</span><select id="globalRound"><option value="1">Round 1</option></select></label>
+        <button id="applySelection" type="button">Explore →</button>
+      </div>
+      <div id="selectionNote" class="selection-note">Choose a counselling and round to load the relevant dataset.</div>
     </div>
   </section>
 
-  <section class="section selector-section">
+  <section class="section" id="explorer">
     <div class="section-head">
-      <div>
-        <p class="eyebrow">Explore counselling data</p>
-        <h2>Select your counselling & round</h2>
-      </div>
-      <span class="status">More rounds can be added later without changing the page design.</span>
-    </div>
-
-    <div class="global-filters card">
-      <label>
-        <span>Counselling</span>
-        <select id="globalCounselling">
-          <option value="AIQ">All India Quota (AIQ)</option>
-          <option value="BIHAR">Bihar PGMAC</option>
-        </select>
-      </label>
-      <label>
-        <span>Year</span>
-        <select id="globalYear">
-          <option value="2025">2025</option>
-        </select>
-      </label>
-      <label>
-        <span>Round</span>
-        <select id="globalRound">
-          <option value="1">Round 1</option>
-        </select>
-      </label>
-      <button id="applySelection" type="button">Apply selection</button>
-    </div>
-
-    <div id="selectionNote" class="selection-note">
-      Select a counselling and round, then click <b>Apply selection</b>. Detailed seat/allotment tables stay hidden until you choose what you want to explore.
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">Current data loaded</p>
-        <h2>Round 1 — 2025</h2>
-      </div>
+      <div><p class="eyebrow">AT A GLANCE</p><h2>Round 1 — 2025</h2></div>
       <span id="status" class="status">Loading data…</span>
     </div>
 
     <div class="stats">
-      <div class="stat"><span>AIQ Seats</span><strong id="totalSeats">—</strong></div>
-      <div class="stat"><span>AIQ Institutes</span><strong id="aiqInstitutes">—</strong></div>
-      <div class="stat"><span>AIQ Programs</span><strong id="aiqPrograms">—</strong></div>
-      <div class="stat"><span>PGMAC Allotments</span><strong id="allotmentCount">—</strong></div>
+      <div class="stat"><span>AIQ Seats</span><strong id="totalSeats">—</strong><small>in selected matrix</small></div>
+      <div class="stat"><span>Institutes</span><strong id="aiqInstitutes">—</strong><small>unique institutions</small></div>
+      <div class="stat"><span>Programs</span><strong id="aiqPrograms">—</strong><small>specialties / courses</small></div>
+      <div class="stat"><span>Allotments</span><strong id="allotmentCount">—</strong><small>loaded result records</small></div>
     </div>
   </section>
 
-  <section id="seat-matrix" class="section">
+  <section class="section explore-section">
     <div class="section-head">
-      <div>
-        <p class="eyebrow">AIQ source</p>
-        <h2>Seat Matrix Explorer</h2>
-      </div>
+      <div><p class="eyebrow">SEARCH THE DATA</p><h2>Explore seats</h2></div>
+      <span class="muted">Detailed rows stay hidden until you search.</span>
     </div>
 
     <div id="matrixExplorer" class="explorer" hidden>
-      <div class="filters card">
-        <input id="matrixInstitute" placeholder="Search institute">
-        <input id="matrixProgram" placeholder="Search specialty / program">
-        <select id="matrixQuota"><option value="">All quotas</option></select>
-        <button id="matrixSearch" type="button">Search</button>
+      <div class="search-card">
+        <div class="search-icon">⌕</div>
+        <div class="search-fields">
+          <label><span>Institute / Hospital</span><input id="matrixInstitute" placeholder="e.g. AIIMS, IGIMS, BJMC"></label>
+          <label><span>Specialty / Program</span><input id="matrixProgram" placeholder="e.g. General Medicine"></label>
+          <label><span>Quota</span><select id="matrixQuota"><option value="">All quotas</option></select></label>
+          <button id="matrixSearch" type="button">Search seats</button>
+        </div>
       </div>
-
-      <div class="table-wrap card">
-        <table>
-          <thead>
-            <tr>
-              <th>Institute</th><th>Program</th><th>Quota</th>
-              <th>Open</th><th>EWS</th><th>OBC</th><th>SC</th><th>ST</th><th>Total</th>
-            </tr>
-          </thead>
-          <tbody id="matrixBody"></tbody>
-        </table>
-      </div>
+      <div class="result-heading"><strong>Seat Matrix</strong><span>Showing matching records</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Institute</th><th>Program</th><th>Quota</th><th>Open</th><th>EWS</th><th>OBC</th><th>SC</th><th>ST</th><th>Total</th></tr></thead><tbody id="matrixBody"></tbody></table></div>
     </div>
-    <div id="matrixPrompt" class="selection-note">
-      Choose a counselling and round above to reveal the seat matrix.
-    </div>
+    <div id="matrixPrompt" class="empty-panel">Select a counselling and round above to reveal the seat explorer.</div>
   </section>
 
-  <section id="allotments" class="section">
+  <section class="section allot-section">
     <div class="section-head">
-      <div>
-        <p class="eyebrow">Bihar PGMAC source</p>
-        <h2>Allotment Explorer</h2>
-      </div>
+      <div><p class="eyebrow">ALLOTMENT DATA</p><h2>Explore allotments</h2></div>
+      <span class="muted">Use AIR, institute or specialty.</span>
     </div>
-
     <div id="allotmentExplorer" class="explorer" hidden>
-      <div class="filters card">
-        <input id="allotInstitute" placeholder="Search institute">
-        <input id="allotBranch" placeholder="Search specialty / branch">
-        <select id="allotCategory"><option value="">All allotted categories</option></select>
-        <input id="allotAir" type="number" min="1" placeholder="Max AIR">
-        <button id="allotSearch" type="button">Search</button>
+      <div class="search-card">
+        <div class="search-icon">⌕</div>
+        <div class="search-fields">
+          <label><span>Institute / Hospital</span><input id="allotInstitute" placeholder="Search institute"></label>
+          <label><span>Specialty / Branch</span><input id="allotBranch" placeholder="Search specialty"></label>
+          <label><span>Allotted category</span><select id="allotCategory"><option value="">All categories</option></select></label>
+          <label><span>Maximum AIR</span><input id="allotAir" type="number" min="1" placeholder="e.g. 10000"></label>
+          <button id="allotSearch" type="button">Search allotments</button>
+        </div>
       </div>
-
-      <div class="table-wrap card">
-        <table>
-          <thead>
-            <tr>
-              <th>AIR</th><th>Institute</th><th>Branch</th>
-              <th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th>
-            </tr>
-          </thead>
-          <tbody id="allotmentBody"></tbody>
-        </table>
-      </div>
+      <div class="result-heading"><strong>Allotment Results</strong><span>Maximum 250 matching records</span></div>
+      <div class="table-wrap"><table><thead><tr><th>AIR</th><th>Institute</th><th>Branch</th><th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th></tr></thead><tbody id="allotmentBody"></tbody></table></div>
     </div>
-    <div id="allotmentPrompt" class="selection-note">
-      Allotment records are shown only after you select a counselling and round.
-    </div>
+    <div id="allotmentPrompt" class="empty-panel">Allotment records appear here after you select a counselling and round.</div>
   </section>
 
-  <section class="section">
-    <div class="section-head">
-      <div>
-        <p class="eyebrow">Derived insights</p>
-        <h2>What the data tells us</h2>
-      </div>
-    </div>
+  <section class="section" id="insights">
+    <div class="section-head"><div><p class="eyebrow">EARLY INSIGHTS</p><h2>What the current data shows</h2></div></div>
     <div class="insight-grid">
-      <div class="insight card"><b id="topProgram">—</b><span>Largest AIQ program by seats in the loaded matrix</span></div>
-      <div class="insight card"><b id="topInstitute">—</b><span>Institute with the largest AIQ seat count in the loaded matrix</span></div>
-      <div class="insight card"><b id="bestObserved">—</b><span>Lowest observed AIR in the loaded PGMAC allotment data</span></div>
+      <article class="insight"><div class="insight-label">Largest program</div><strong id="topProgram">—</strong><p>By total seats in the selected AIQ matrix.</p></article>
+      <article class="insight"><div class="insight-label">Largest institute</div><strong id="topInstitute">—</strong><p>By total seats in the selected matrix.</p></article>
+      <article class="insight"><div class="insight-label">Lowest observed AIR</div><strong id="bestObserved">—</strong><p>Observed in the loaded PGMAC allotment records.</p></article>
     </div>
+    <div class="future-strip"><span>Next layer</span><b>Round-to-round movement</b><span>•</span><b>Opening / closing AIR</b><span>•</span><b>College comparisons</b><span>•</span><b>State counselling</b></div>
   </section>
 
-  <section id="about" class="about">
-    <h2>Built from source documents.</h2>
-    <p>SeatMentor is designed to turn official counselling documents into structured, searchable information. More rounds and state counselling datasets can be added without changing the core website.</p>
+  <section class="about" id="about">
+    <div><p class="eyebrow">ABOUT SEATMENTOR</p><h2>One place for counselling data.</h2></div>
+    <p>SeatMentor is being built to turn official counselling documents into structured, searchable and comparable information. New rounds and state counselling datasets can be added to the same framework.</p>
   </section>
 </main>
-
-<footer>© 2026 SeatMentor</footer>
+<footer>SeatMentor · Built for clearer counselling decisions</footer>
 <script src="script.js"></script>
 </body>
 </html>
