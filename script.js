@@ -62,6 +62,7 @@ async function loadDataset(){
     const [a,c,m]=await Promise.all([loadCSV(p.allotment),loadCSV(p.cutoff),loadCSV(p.movement)]);
     state.allotments=a; state.cutoffs=c; state.movement=m; state.loaded=true;
     setRoundOptions(a);
+    populateRankFilters();
     document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
     document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
     document.getElementById("rankEmpty").hidden=false;
@@ -81,41 +82,84 @@ function currentCutoffs(){
   return state.cutoffs.filter(x=>x.round===state.round);
 }
 
+function cleanCategory(v){
+  const s=norm(v);
+  if(!s || s==="-" || /^-+$/.test(s)) return "";
+  if(/EWS/.test(s)) return "EWS";
+  if(/(^|\s)(OBC|BC|BCOP|BCPH)(\s|$)/.test(s)) return "OBC";
+  if(/(^|\s)(SC|SCOP|SCPH)(\s|$)/.test(s)) return "SC";
+  if(/(^|\s)(ST|STOP)(\s|$)/.test(s)) return "ST";
+  if(/(^|\s)(UR|UROP|URPH|GENERAL|GEN)(\s|$)/.test(s)) return "GENERAL";
+  if(/NRI/.test(s)) return "NRI";
+  return s;
+}
+
+function populateRankFilters(){
+  const rows=currentAllotments();
+  const stateSel=document.getElementById("rankState");
+  const catSel=document.getElementById("rankCategory");
+  const states=[...new Set(rows.map(x=>String(x.state||"").trim()).filter(Boolean))].sort();
+  const cats=[...new Set(rows.map(x=>cleanCategory(x.category)).filter(Boolean))].sort();
+  stateSel.innerHTML='<option value="">All states</option>'+states.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  catSel.innerHTML='<option value="">All categories</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  // AIQ source currently carries "All India" rather than the college's state;
+  // keep the filter honest rather than inventing a college-state mapping.
+  if(state.counselling==="AIQ" && states.length===1 && states[0]==="All India"){
+    stateSel.title="AIQ source currently records counselling as All India; college-state mapping will be added in the next data-quality pass.";
+  }
+}
+
 function runRank(){
   const air=Number(document.getElementById("myRank").value);
   if(!air || air<1){document.getElementById("myRank").focus();return}
   const course=norm(document.getElementById("rankCourse").value);
   const college=norm(document.getElementById("rankCollege").value);
-  let rows=currentCutoffs().filter(x=>Number(x.closing_rank)>=air);
-  if(course) rows=rows.filter(x=>norm(x.course).includes(course));
-  if(college) rows=rows.filter(x=>norm(x.college).includes(college));
-  rows.sort((a,b)=>Number(a.closing_rank)-Number(b.closing_rank));
-  const unique=[]; const seen=new Set();
-  for(const x of rows){
-    const key=`${x.college}|${x.course}`;
-    if(seen.has(key))continue;
-    seen.add(key); unique.push(x);
-    if(unique.length>=60)break;
+  const wantedState=document.getElementById("rankState").value;
+  const wantedCategory=document.getElementById("rankCategory").value;
+
+  // Build the selected-round closing range directly from the round's final
+  // allotments so category/state filters apply to the same round only.
+  let base=currentAllotments().filter(x=>Number(x.rank_value)>0);
+  if(wantedState) base=base.filter(x=>String(x.state||"").trim()===wantedState);
+  if(wantedCategory) base=base.filter(x=>cleanCategory(x.category)===wantedCategory);
+  if(course) base=base.filter(x=>norm(x.course).includes(course));
+  if(college) base=base.filter(x=>norm(x.college).includes(college));
+
+  const groups=new Map();
+  for(const x of base){
+    const key=`${x.college}|${x.course}|${wantedCategory||cleanCategory(x.category)}`;
+    const rank=Number(x.rank_value);
+    if(!groups.has(key)) groups.set(key,{college:x.college,course:x.course,closing_rank:rank,allotment_count:1});
+    else {
+      const g=groups.get(key);
+      g.closing_rank=Math.max(g.closing_rank,rank);
+      g.allotment_count++;
+    }
   }
+  let rows=[...groups.values()].filter(x=>x.closing_rank>=air);
+  rows.sort((a,b)=>a.closing_rank-b.closing_rank);
+  rows=rows.slice(0,60);
+
   document.getElementById("rankEmpty").hidden=true;
   document.getElementById("rankResults").hidden=false;
-  document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
-  document.getElementById("rankResultCount").textContent=`${fmt(unique.length)} historical matches`;
+  const filters=[wantedState,wantedCategory].filter(Boolean);
+  document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}${filters.length?" · "+filters.join(" · "):""}`;
+  document.getElementById("rankResultCount").textContent=`${fmt(rows.length)} historical matches`;
   const grid=document.getElementById("rankGrid");
-  if(!unique.length){
-    grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty or college filter, or choose another round.</p></div>`;
+  if(!rows.length){
+    grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing a filter, choosing another category, or selecting another round.</p></div>`;
     return;
   }
-  grid.innerHTML=unique.map(x=>{
+  grid.innerHTML=rows.map(x=>{
     const close=Number(x.closing_rank), buffer=close-air;
     return `<article class="rank-item">
-      <span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span>
+      <span class="tag">HISTORICALLY REACHABLE</span>
       <h4>${esc(x.course||"Course not available")}</h4>
       <p>${esc(x.college||"Institute not available")}</p>
       <div class="rank-metrics">
         <div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div>
         <div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div>
-        <div class="metric"><small>Historical buffer</small><strong class="buffer">${buffer>=0?"+":""}${fmt(buffer)}</strong></div>
+        <div class="metric"><small>Historical buffer</small><strong class="buffer">+${fmt(buffer)}</strong></div>
         <div class="metric"><small>Allotments</small><strong>${fmt(x.allotment_count)}</strong></div>
       </div>
     </article>`;
@@ -171,6 +215,7 @@ document.getElementById("counselling").addEventListener("change",async e=>{
 });
 document.getElementById("round").addEventListener("change",e=>{
   state.round=e.target.value;
+  populateRankFilters();
   document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
   clearExplore();
 });
