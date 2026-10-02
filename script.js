@@ -9,6 +9,12 @@ const PATHS = {
 
 const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], loaded:false };
 
+// Optional: after creating a Formspree form, paste its endpoint here.
+// Example: https://formspree.io/f/abcdwxyz
+// Until then, SeatMentor falls back to a pre-filled GitHub issue composer.
+const FORM_ENDPOINT = "";
+const GITHUB_ISSUE_URL = "https://github.com/Piyush-kumar-tiwary/seatmentor/issues/new";
+
 const CATEGORY_OPTIONS = [
   ["ALL","All categories"], ["GENERAL","General / UR"], ["OBC","OBC"],
   ["SC","SC"], ["ST","ST"], ["EWS","EWS"], ["NRI","NRI"]
@@ -576,5 +582,72 @@ document.querySelectorAll(".chips button").forEach(b=>b.addEventListener("click"
 document.getElementById("myRank").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
 document.getElementById("rankCourse").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
 document.getElementById("rankCollege").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
+
+function feedbackContext(){
+  const counselling = document.getElementById("counselling")?.selectedOptions?.[0]?.textContent || "—";
+  const round = document.getElementById("round")?.selectedOptions?.[0]?.textContent || "—";
+  const stateLabel = document.getElementById("rankState")?.selectedOptions?.[0]?.textContent || "All college states";
+  const category = document.getElementById("rankCategory")?.selectedOptions?.[0]?.textContent || "All categories";
+  const instituteType = document.getElementById("rankInstituteType")?.selectedOptions?.[0]?.textContent || "All institutes";
+  const course = document.getElementById("rankCourse")?.selectedOptions?.[0]?.textContent || "All courses";
+  const college = document.getElementById("rankCollege")?.value?.trim() || "All colleges";
+  const air = document.getElementById("myRank")?.value?.trim() || "—";
+  return `AIR ${air} · ${counselling} · ${round} · ${stateLabel} · ${category} · ${instituteType} · ${course} · ${college}`;
+}
+
+function openFeedback(){
+  const modal=document.getElementById("feedbackModal");
+  document.getElementById("feedbackContext").textContent=feedbackContext();
+  document.getElementById("feedbackStatus").textContent="";
+  modal.hidden=false;
+  setTimeout(()=>document.getElementById("feedbackObserved")?.focus(),50);
+}
+function closeFeedback(){ document.getElementById("feedbackModal").hidden=true; }
+function feedbackMessage(){
+  const type=document.getElementById("feedbackType").value;
+  const observed=document.getElementById("feedbackObserved").value.trim();
+  const expected=document.getElementById("feedbackExpected").value.trim();
+  const email=document.getElementById("feedbackEmail").value.trim();
+  return `SeatMentor data issue report\n\nIssue type: ${type}\nContext: ${feedbackContext()}\n\nWhat the user saw:\n${observed || "Not provided"}\n\nExpected / correction:\n${expected || "Not provided"}\n\nUser email: ${email || "Not provided"}`;
+}
+async function submitFeedback(){
+  const observed=document.getElementById("feedbackObserved").value.trim();
+  const status=document.getElementById("feedbackStatus");
+  const button=document.getElementById("feedbackSubmit");
+  if(!observed){ status.textContent="Please describe the issue first."; return; }
+  button.disabled=true; status.textContent="Sending report…";
+  try{
+    const payload={
+      subject:`SeatMentor · ${document.getElementById("feedbackType").value}`,
+      issue_type:document.getElementById("feedbackType").value,
+      context:feedbackContext(),
+      observed,
+      expected:document.getElementById("feedbackExpected").value.trim(),
+      email:document.getElementById("feedbackEmail").value.trim()
+    };
+    if(FORM_ENDPOINT){
+      const res=await fetch(FORM_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(payload)});
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      status.textContent="Thanks — your report has been sent.";
+      setTimeout(closeFeedback,900);
+    }else{
+      const params=new URLSearchParams({title:`SeatMentor data issue · ${payload.issue_type}`,body:feedbackMessage()});
+      window.open(`${GITHUB_ISSUE_URL}?${params.toString()}`,"_blank","noopener");
+      status.textContent="A pre-filled GitHub report page has been opened. Submit it there.";
+    }
+  }catch(err){
+    console.error(err);
+    status.textContent="Could not send automatically. Please try again.";
+  }finally{
+    button.disabled=false;
+  }
+}
+
+document.getElementById("feedbackOpen").addEventListener("click",openFeedback);
+document.getElementById("feedbackClose").addEventListener("click",closeFeedback);
+document.getElementById("feedbackCancel").addEventListener("click",closeFeedback);
+document.querySelectorAll("[data-close-feedback]").forEach(el=>el.addEventListener("click",closeFeedback));
+document.getElementById("feedbackSubmit").addEventListener("click",submitFeedback);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!document.getElementById("feedbackModal").hidden)closeFeedback()});
 
 loadDataset();

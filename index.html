@@ -203,12 +203,71 @@
     </div>
   </div>
 </section>
+
+<section class="section feedback-section" id="feedback">
+  <div class="feedback-strip">
+    <div class="feedback-copy">
+      <span class="feedback-icon">⚠</span>
+      <div>
+        <strong>Spotted an error?</strong>
+        <p>Tell us what you found so we can improve the data.</p>
+      </div>
+    </div>
+    <button id="feedbackOpen" class="feedback-button">Let us know <b>→</b></button>
+  </div>
+</section>
+
+<div id="feedbackModal" class="feedback-modal" hidden>
+  <div class="feedback-backdrop" data-close-feedback></div>
+  <div class="feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+    <button class="feedback-close" id="feedbackClose" aria-label="Close">×</button>
+    <div class="eyebrow">HELP US IMPROVE SEATMENTOR</div>
+    <h3 id="feedbackTitle">Spotted an error? Let us know.</h3>
+    <p class="feedback-intro">You can report a missing allotment, wrong course/college, incorrect category, or any other data issue.</p>
+
+    <label>
+      <span>What is the issue?</span>
+      <select id="feedbackType">
+        <option>Missing allotment / record</option>
+        <option>Wrong course</option>
+        <option>Wrong college / institute</option>
+        <option>Wrong category</option>
+        <option>Wrong round / AIR</option>
+        <option>Other</option>
+      </select>
+    </label>
+
+    <div class="feedback-context" id="feedbackContext">—</div>
+
+    <label>
+      <span>What did you see?</span>
+      <textarea id="feedbackObserved" rows="3" placeholder="Example: AIR 4900 was allotted General Medicine in Round 3, but SeatMentor showed no match."></textarea>
+    </label>
+
+    <label>
+      <span>What should it show? <em>optional</em></span>
+      <textarea id="feedbackExpected" rows="2" placeholder="Example: D.M.C. Laheriasarai · MD - General Medicine · UR"></textarea>
+    </label>
+
+    <label>
+      <span>Your email <em>optional</em></span>
+      <input id="feedbackEmail" type="email" placeholder="name@example.com">
+    </label>
+
+    <div class="feedback-actions">
+      <button id="feedbackCancel" class="secondary">Cancel</button>
+      <button id="feedbackSubmit" class="primary">Submit report <b>→</b></button>
+    </div>
+    <div id="feedbackStatus" class="feedback-status" aria-live="polite"></div>
+  </div>
+</div>
+
   <datalist id="collegeOptions"></datalist>
   <datalist id="courseOptions"></datalist>
 
 </main>
 
 <footer>SeatMentor · 2025 counselling intelligence · Historical data explorer</footer>
-<script src="script.js?v=15"></script>
+<script src="script.js?v=22"></script>
 </body>
 </html>
