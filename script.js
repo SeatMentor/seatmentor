@@ -288,19 +288,51 @@ function cleanCollegeName(value){
   return s;
 }
 
+function looksLikeSeatMarker(value){
+  const n=norm(value);
+  return /^(?:\d+\.)?(?:RCG|EBC|BC|UR|EWS|SC|ST)\s*\(?(?:DIPLOMA|DEGREE)?\)?(?:[- ]\s*\d+)?$/.test(n)
+    || /^(?:\d+\.)?(?:RCG|EBC|BC|UR|EWS|SC|ST)\b.*(?:DIPLOMA|DEGREE)/.test(n);
+}
+
+function looksLikeRemark(value){
+  const n=norm(value);
+  return !n || /AGAINST|JUMP OVER|COMPENSATION SEAT|FRESH ALLOTMENT|CATEGORY SEAT|ALLOTTED|NOT ALLOTTED|VACANCY/.test(n);
+}
+
+function cleanRowCategory(x){
+  const direct=cleanCategory(x.category);
+  if(direct) return direct;
+  // In several Bihar round extracts the PDF columns are shifted. The reservation
+  // category is then carried by a seat marker in the college column while the
+  // category column contains the course name. Preserve only explicit categories.
+  const n=norm(x.college);
+  if(/(?:^|\s)(EBC)(?:\s|\(|-|$)/.test(n)) return "EBC";
+  if(/(?:^|\s)(EWS)(?:\s|\(|-|$)/.test(n)) return "EWS";
+  if(/(?:^|\s)(BC)(?:\s|\(|-|$)/.test(n)) return "OBC";
+  if(/(?:^|\s)(SC)(?:\s|\(|-|$)/.test(n)) return "SC";
+  if(/(?:^|\s)(ST)(?:\s|\(|-|$)/.test(n)) return "ST";
+  if(/(?:^|\s)(UR)(?:\s|\(|-|$)/.test(n)) return "GENERAL";
+  return "";
+}
+
 function normalizeRecord(x){
   const rawCollege=String(x.college||"");
   const rawCourse=String(x.course||"");
-  const course=canonicalCourse(rawCourse,rawCollege);
+  const rawCategory=String(x.category||"");
+
+  // Bihar PDFs use INSTITUTE + BRANCH, but a subset of extracted Round-1/3 rows
+  // are shifted: college = seat marker, course = institute, category = branch.
+  // Use all three fields only when a value actually looks like a course/institute.
+  const course=canonicalCourse(rawCourse,rawCategory,rawCollege);
   const collegeA=cleanCollegeName(rawCollege);
   const collegeB=cleanCollegeName(rawCourse);
-  // Bihar and a few state extracts can have the two fields shifted. If the college
-  // field is clearly a course and the course field clearly looks like a remark,
-  // do not expose either as a college. The clean college remains blank until the
-  // underlying source has a valid institute value.
+
   let college=collegeA;
-  if(!college && collegeB && !canonicalCourse(rawCollege)) college=collegeB;
-  return {...x,_college:college,_course:course};
+  if(looksLikeSeatMarker(rawCollege) && collegeB && !looksLikeRemark(rawCourse) && !canonicalCourse(rawCourse)) college=collegeB;
+  if(!college && collegeB && !looksLikeRemark(rawCourse)) college=collegeB;
+  if(canonicalCourse(rawCollege) && looksLikeRemark(rawCourse)) college="";
+
+  return {...x,_college:college,_course:course,_category:cleanRowCategory(x)};
 }
 
 function normalizeDataset(rows){ return rows.map(normalizeRecord); }
@@ -348,7 +380,7 @@ function rankFilteredAllotments(){
   const selectedCategory=document.getElementById("rankCategory").value;
   let rows=currentAllotments();
   if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>deriveCollegeState(x)===selectedState);
-  if(selectedCategory && selectedCategory!=="ALL") rows=rows.filter(x=>cleanCategory(x.category)===selectedCategory);
+  if(selectedCategory && selectedCategory!=="ALL") rows=rows.filter(x=>(x._category||cleanCategory(x.category))===selectedCategory);
   return rows.filter(x=>Number(x.rank_value)>0 && x.college && x.course);
 }
 
@@ -374,7 +406,7 @@ function runRank(){
   // This keeps category/state filters tied to the same round instead of mixing rounds.
   const groups=new Map();
   for(const x of source){
-    const cat=cleanCategory(x.category) || "OTHER";
+    const cat=x._category || cleanCategory(x.category) || "OTHER";
     const key=category==="ALL" ? `${x._college}|${x._course}|${cat}` : `${x._college}|${x._course}`;
     const rank=Number(x.rank_value);
     const prev=groups.get(key);
