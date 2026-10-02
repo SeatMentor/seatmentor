@@ -14,16 +14,32 @@ const CATEGORY_OPTIONS = [
   ["SC","SC"], ["ST","ST"], ["EWS","EWS"], ["NRI","NRI"]
 ];
 
+// IMPORTANT: Bihar PGMAC has EBC as a distinct reservation category.
+// Do not map EBC to OBC or EWS. The source allotment row must retain
+// its actual category for filtering.
 function cleanCategory(value){
   const s = norm(value);
   if(!s) return "";
   if(s === "GENERAL" || s === "GEN" || s === "UR" || s.startsWith("UR ") || s.startsWith("UROP") || s.startsWith("URPH")) return "GENERAL";
-  if(s === "OBC" || s === "BC" || s.startsWith("BCOP") || s.startsWith("BCPH") || s === "EBC") return "OBC";
+  if(s === "EBC" || s.startsWith("EBC ")) return "EBC";
+  if(s === "OBC" || s === "BC" || s.startsWith("BCOP") || s.startsWith("BCPH")) return "OBC";
   if(s === "SC" || s.startsWith("SCOP") || s.startsWith("SCPH")) return "SC";
   if(s === "ST" || s.startsWith("STOP")) return "ST";
   if(s === "EWS" || s.startsWith("EWOP") || s.startsWith("EWPH")) return "EWS";
   if(s === "NRI" || s.includes(" NRI ") || s.endsWith(" NRI")) return "NRI";
   return "";
+}
+
+function setCategoryOptions(){
+  const sel=document.getElementById("rankCategory");
+  if(!sel) return;
+  const isBihar = state.counselling === "BIHAR";
+  const options = isBihar
+    ? [["ALL","All categories"],["GENERAL","General / UR"],["OBC","OBC / BC"],["EBC","EBC (Bihar)"],["SC","SC"],["ST","ST"],["EWS","EWS"],["NRI","NRI"]]
+    : CATEGORY_OPTIONS;
+  const previous = sel.value;
+  sel.innerHTML = options.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join("");
+  sel.value = options.some(([v])=>v===previous) ? previous : "ALL";
 }
 
 function parseCSV(text){
@@ -85,6 +101,7 @@ async function loadDataset(){
     state.allotments=a; state.cutoffs=c; state.movement=m; state.loaded=true;
     setRoundOptions(a);
     populateRankStateOptions();
+    setCategoryOptions();
     document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
     document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
     document.getElementById("rankEmpty").hidden=false;
