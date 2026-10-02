@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeatMentor — Medical Counselling</title>
+  <meta name="description" content="SeatMentor helps students explore medical counselling seats, colleges and specialties.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Seat<span>Mentor</span></div>
+    <nav>
+      <a href="#search">Seat Search</a>
+      <a href="#insights">Insights</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">NBEMS / Medical Counselling</p>
+        <h1>Find the right seat,<br><span>with clarity.</span></h1>
+        <p class="sub">Search colleges, specialties and seat availability in one simple place.</p>
+        <a class="cta" href="#search">Explore Seats →</a>
+      </div>
+    </section>
+
+    <section id="search" class="card search-card">
+      <h2>Seat Search</h2>
+      <div class="filters">
+        <input id="college" placeholder="College / Hospital">
+        <input id="specialty" placeholder="Specialty">
+        <select id="category">
+          <option value="">All categories</option>
+          <option>General</option>
+          <option>OBC</option>
+          <option>SC</option>
+          <option>ST</option>
+          <option>EWS</option>
+        </select>
+        <button onclick="searchSeats()">Search</button>
+      </div>
+      <div id="results" class="results">
+        <div class="empty">Seat data will appear here.</div>
+      </div>
+    </section>
+
+    <section id="insights" class="section">
+      <p class="eyebrow">Coming next</p>
+      <h2>Useful counselling insights</h2>
+      <div class="grid">
+        <div class="mini"><b>Seat Matrix</b><span>College-wise and specialty-wise seats</span></div>
+        <div class="mini"><b>Cut-off Trends</b><span>Previous-round closing rank insights</span></div>
+        <div class="mini"><b>College Finder</b><span>Shortlist options based on your rank</span></div>
+      </div>
+    </section>
+
+    <section id="about" class="about">
+      <h2>Built for students.</h2>
+      <p>SeatMentor is designed to make counselling information easier to understand and compare.</p>
+    </section>
+  </main>
+
+  <footer>© 2026 SeatMentor</footer>
+  <script src="script.js"></script>
+</body>
+</html>
