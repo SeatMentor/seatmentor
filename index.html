@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SeatMentor — PG Counselling Intelligence</title>
+<meta name="description" content="Explore historical PG counselling allotments and rank ranges across AIQ and state counselling.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#top"><span>Seat</span>Mentor</a>
+  <nav>
+    <a href="#rank">My Rank</a>
+    <a href="#explore">Explore</a>
+    <a href="#movement">Movement</a>
+  </nav>
+  <div class="live"><i></i> 2025 data</div>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="hero-copy">
+    <div class="eyebrow">PG COUNSELLING INTELLIGENCE</div>
+    <h1>Know what your rank<br><em>has historically reached.</em></h1>
+    <p>Explore round-wise allotments across AIQ and state counselling. Enter an AIR, choose a round, and see the colleges and courses that were historically within range.</p>
+  </div>
+  <div class="hero-card">
+    <div class="hero-card-label">START HERE</div>
+    <div class="hero-card-title">Your AIR</div>
+    <div class="hero-mini">Compare your rank with observed closing ranks from the selected round.</div>
+    <a href="#rank" class="primary small">Check my rank <b>→</b></a>
+  </div>
+</section>
+
+<section class="rank section" id="rank">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">01 · MY RANK</div>
+      <h2>What can my rank reach?</h2>
+    </div>
+    <span class="data-badge" id="rankDataStatus">Preparing data…</span>
+  </div>
+
+  <div class="control-card">
+    <div class="control-grid">
+      <label class="wide">
+        <span>Your NEET AIR</span>
+        <input id="myRank" type="number" min="1" placeholder="e.g. 5000">
+      </label>
+      <label>
+        <span>Counselling</span>
+        <select id="counselling">
+          <option value="AIQ">All India Quota</option>
+          <option value="BIHAR">Bihar PGMAC</option>
+          <option value="UP">Uttar Pradesh</option>
+          <option value="MP">Madhya Pradesh</option>
+          <option value="RAJASTHAN">Rajasthan</option>
+          <option value="JHARKHAND">Jharkhand</option>
+        </select>
+      </label>
+      <label>
+        <span>Round</span>
+        <select id="round"></select>
+      </label>
+      <label>
+        <span>State</span>
+        <select id="rankState"><option value="ALL">All college states</option></select>
+      </label>
+      <label>
+        <span>Category</span>
+        <select id="rankCategory">
+          <option value="ALL">All categories</option>
+          <option value="GENERAL">General / UR</option>
+          <option value="OBC">OBC</option>
+          <option value="SC">SC</option>
+          <option value="ST">ST</option>
+          <option value="EWS">EWS</option>
+          <option value="NRI">NRI</option>
+        </select>
+      </label>
+      <label>
+        <span>Course <em>optional</em></span>
+        <select id="rankCourse"><option value="">All courses</option></select>
+      </label>
+      <label>
+        <span>College <em>optional</em></span>
+        <input id="rankCollege" list="collegeOptions" placeholder="Start typing a college">
+      </label>
+      <button id="rankSearch" class="primary">Find my historical range <b>→</b></button>
+    </div>
+    <div class="rule">
+      <b>How this works</b>
+      <span>We compare your AIR with the observed closing AIR in the selected counselling and round. This is historical data, not a guaranteed future allotment.</span>
+    </div>
+  </div>
+
+  <div id="rankEmpty" class="empty-state">
+    <div class="empty-icon">5000</div>
+    <h3>Enter your AIR to begin</h3>
+    <p>Try <b>5000</b> with AIQ and Round 1.</p>
+  </div>
+
+  <div id="rankResults" hidden>
+    <div class="result-head">
+      <div>
+        <div class="eyebrow">HISTORICAL REACH</div>
+        <h3 id="rankResultTitle">—</h3>
+      </div>
+      <div class="result-count" id="rankResultCount">—</div>
+    </div>
+    <div class="rank-grid" id="rankGrid"></div>
+  </div>
+</section>
+
+<section class="section explore" id="explore">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">02 · EXPLORE</div>
+      <h2>Search the selected round</h2>
+    </div>
+    <span class="data-badge" id="exploreStatus">Select a dataset</span>
+  </div>
+
+  <div class="explore-card">
+    <div class="explore-controls">
+      <label>
+        <span>College / Institute</span>
+        <input id="searchCollege" list="collegeOptions" placeholder="Start typing a college">
+      </label>
+      <label>
+        <span>Specialty / Course</span>
+        <input id="searchCourse" list="courseOptions" placeholder="Start typing a course">
+      </label>
+      <label>
+        <span>Maximum AIR</span>
+        <input id="searchMaxAir" type="number" placeholder="e.g. 10000">
+      </label>
+      <button id="exploreSearch" class="secondary">Search</button>
+    </div>
+    <div class="chips">
+      <span>Quick search</span>
+      <button data-course="GENERAL MEDICINE">General Medicine</button>
+      <button data-course="PAEDIATRICS">Paediatrics</button>
+      <button data-course="RADIOLOGY">Radiology</button>
+      <button data-course="ORTHOPAEDICS">Orthopaedics</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-head">
+      <b id="exploreTitle">Allotment results</b>
+      <span id="exploreMeta">Search to view records</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>AIR</th><th>College / Institute</th><th>Course</th><th>Category</th><th>Quota</th><th>Seat type</th></tr>
+        </thead>
+        <tbody id="exploreBody"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section movement" id="movement">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">03 · ROUND MOVEMENT</div>
+      <h2>How did the historical range move?</h2>
+    </div>
+    <span class="data-badge">Round-wise</span>
+  </div>
+
+  <div class="movement-card">
+    <div class="movement-controls">
+      <label><span>College / Institute</span><input id="moveCollege" list="collegeOptions" placeholder="Start typing a college"></label>
+      <label><span>Course</span><input id="moveCourse" list="courseOptions" placeholder="Start typing a course"></label>
+      <button id="moveSearch" class="secondary">Show movement</button>
+    </div>
+    <div id="movementEmpty" class="movement-empty">Enter a college or course to compare observed opening and closing AIR across rounds.</div>
+    <div id="movementResults" hidden>
+      <div class="movement-title" id="movementTitle">—</div>
+      <div class="movement-row" id="movementRow"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section note-section">
+  <div class="note">
+    <div class="note-icon">i</div>
+    <div>
+      <b>Read the numbers correctly</b>
+      <p>“Historically reachable” means your AIR is better than or equal to an observed closing AIR for the selected dataset. It does not guarantee an allotment because choice order, eligibility, category, quota, vacancies and counselling rules also affect allocation.</p>
+    </div>
+  </div>
+</section>
+  <datalist id="collegeOptions"></datalist>
+  <datalist id="courseOptions"></datalist>
+
+</main>
+
+<footer>SeatMentor · 2025 counselling intelligence · Historical data explorer</footer>
+<script src="script.js?v=15"></script>
+</body>
+</html>
