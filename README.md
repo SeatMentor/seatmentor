@@ -1,2 +1,2 @@
-# Piyush_seatmentor
+# seatmentor
 Medical Counselling and seat discovery platform
