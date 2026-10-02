@@ -397,9 +397,41 @@ function stripCollegeJunkStart(s){
 }
 
 function applyCollegeAlias(s){
+  // Apply aliases against normalized text. The older version tested regexes
+  // containing punctuation against norm(), which strips punctuation and caused
+  // many aliases to miss.
   const n=norm(s);
-  for(const [re,name] of COLLEGE_ALIASES){
-    if(re.test(n)) return name;
+  const rules=[
+    ["INDIRA GANDHI INSTITUTE MEDICAL SCIENCES", "Indira Gandhi Institute of Medical Sciences, Patna"],
+    ["DR D Y PATIL MEDICAL COLLEGE", "Dr. D. Y. Patil Medical College"],
+    ["MAHATMA GANDHI CANCER HOSPITAL", "Mahatma Gandhi Cancer Hospital and Research Institute"],
+    ["SHRI B M PATIL MEDICAL COLLEGE", "Shri B. M. Patil Medical College Hospital and Research Centre"],
+    ["SHRI VASANTRAO NAIK GOVT MEDICAL COLLEGE", "Shri Vasantrao Naik Govt. Medical College, Yavatmal"],
+    ["PANDIT DINDAYAL UPADHYAY MEDICAL COLLEGE", "Pandit Dindayal Upadhyay Medical College, Rajkot"],
+    ["MAULANA AZAD MEDICAL COLLEGE", "Maulana Azad Medical College"],
+    ["NIL RATAN SIRCAR MEDICAL COLLEGE", "Nil Ratan Sircar Medical College"],
+    ["RAVINDRA NATH TAGORE MEDICAL COLLEGE", "Ravindra Nath Tagore Medical College"],
+    ["JASLOK HOSPITAL", "Jaslok Hospital and Research Centre"],
+    ["AIG HOSPITAL", "AIG Hospitals"],
+    ["K S HEGDE MEDICAL ACADEMY", "K. S. Hegde Medical Academy"],
+    ["PGIMER", "PGIMER"],
+    ["JIPMER", "JIPMER"],
+    ["AIIMS NEW DELHI", "AIIMS New Delhi"],
+    ["GURU GOBIND SINGH MEDICAL COLLEGE FARIDKOT", "Guru Gobind Singh Medical College, Faridkot"],
+    ["GANDHI MEDICAL COLLEGE BHOPAL", "Gandhi Medical College, Bhopal"],
+    ["PATNA MEDICAL COLLEGE", "Patna Medical College"],
+    ["DARBHANGA MEDICAL COLLEGE", "Darbhanga Medical College"],
+    ["ANUGRAH NARAYAN MAGADH MEDICAL COLLEGE", "Anugrah Narayan Magadh Medical College, Gaya"],
+    ["S K M C MUZAFFARPUR", "S.K.M.C. Muzaffarpur"],
+    ["D M C LAHERIASARAI", "D.M.C. Laheriasarai"],
+    ["P M C PATNA", "P.M.C. Patna"],
+    ["N M C H SASARAM", "N.M.C. & H., Sasaram"],
+    ["N M C PATNA", "N.M.C. Patna"],
+    ["I G I M S PATNA", "I.G.I.M.S. Patna"],
+    ["G M C BETTIAH", "G.M.C., Bettiah"]
+  ];
+  for(const [needle,name] of rules){
+    if(n.includes(needle)) return name;
   }
   return "";
 }
@@ -461,24 +493,87 @@ function canonicalCollegeName(...values){
   return "";
 }
 
+function isStrongCollegeName(v){
+  const n=norm(v);
+  if(!n || n.length<6) return false;
+  if(/^(?:PAGE|AGE) NO/.test(n)) return false;
+  if(/^[.\-_\s\d]+$/.test(n)) return false;
+  return /(MEDICAL|INSTITUTE|HOSPITAL|UNIVERSITY|ACADEMY|COLLEGE|SCIENCES|CANCER)/.test(n);
+}
+
+function extractCollegeCandidates(raw){
+  const text=String(raw||'').replace(/\uFEFF/g,'').replace(/[\u2013\u2014]/g,'-').replace(/\s+/g,' ').trim();
+  if(!text) return [];
+
+  // AIQ extraction often concatenates multiple institute cells. A 6-digit
+  // pincode is a reliable boundary between such cells. We take the first
+  // meaningful comma-separated segment from each chunk and then normalize it.
+  const chunks=text.split(/\b\d{6}\b/g);
+  const out=[];
+  const seen=new Set();
+  for(let chunk of chunks){
+    chunk=stripCollegeJunkStart(chunk);
+    if(!chunk) continue;
+    let first=(chunk.split(/\s*,\s*/)[0]||'').trim();
+    first=stripCollegeJunkStart(first);
+    if(first.length<4) continue;
+    const alias=applyCollegeAlias(first);
+    const candidate=alias || cleanCollegeName(first);
+    if(!isStrongCollegeName(candidate)) continue;
+    const key=norm(candidate);
+    if(!seen.has(key)){ seen.add(key); out.push(candidate); }
+  }
+
+  // Fallback for clean single-record rows that have no pincode.
+  if(!out.length){
+    const candidate=canonicalCollegeName(text);
+    if(isStrongCollegeName(candidate)) out.push(candidate);
+  }
+  return out;
+}
+
+function extractCourseCandidates(raw){
+  const text=String(raw||'');
+  if(!text) return [];
+  const n=norm(text);
+  const hits=[];
+  for(const [label,re] of COURSE_PATTERNS){
+    const src=re.source;
+    let m;
+    try{
+      const rx=new RegExp(src,'ig');
+      while((m=rx.exec(n))!==null) hits.push({pos:m.index,label});
+    }catch(e){}
+  }
+  hits.sort((a,b)=>a.pos-b.pos);
+  const out=[]; const seen=new Set();
+  for(const h of hits){
+    if(!seen.has(h.label)){seen.add(h.label);out.push(h.label);}
+  }
+  return out;
+}
+
 function buildCollegeMaster(){
   const map=new Map();
-  for(const x of state.allotments){
-    const name=x._college;
-    if(!name) continue;
+  const add=(name, raw='')=>{
+    if(!isStrongCollegeName(name)) return;
     const key=norm(name);
-    if(!key) continue;
     let item=map.get(key);
-    if(!item){
-      item={name,search:new Set()};
-      map.set(key,item);
-    }
+    if(!item){ item={name,search:new Set()}; map.set(key,item); }
+    if(raw) item.search.add(norm(raw));
     item.search.add(norm(name));
-    item.search.add(x._collegeSearch||"");
+  };
+
+  for(const x of state.allotments){
+    for(const c of extractCollegeCandidates(x.college)) add(c,x.college);
   }
+  for(const x of state.movement){
+    for(const c of extractCollegeCandidates(x.college)) add(c,x.college);
+  }
+
   state.collegeMaster=[...map.values()]
-    .map(x=>({...x,searchText:[...x.search].filter(Boolean).join(" ")}))
-    .sort((a,b)=>a.name.localeCompare(b.name,"en",{sensitivity:"base"}));
+    .map(x=>({...x,searchText:[...x.search].filter(Boolean).join(' ')}))
+    .sort((a,b)=>a.name.localeCompare(b.name,'en',{sensitivity:'base'}));
 }
 
 function setupCollegeAutocomplete(inputId, menuId){
@@ -491,7 +586,18 @@ function setupCollegeAutocomplete(inputId, menuId){
   function render(){
     const q=norm(input.value);
     const items=state.collegeMaster
-      .filter(x=>!q || norm(x.searchText).includes(q))
+      .filter(x=>{
+        if(!q) return true;
+        const hay=norm(x.searchText);
+        return hay.includes(q);
+      })
+      .sort((a,b)=>{
+        if(!q) return a.name.localeCompare(b.name,'en',{sensitivity:'base'});
+        const aq=norm(a.name), bq=norm(b.name);
+        const as=aq.startsWith(q)?0:(aq.includes(q)?1:2);
+        const bs=bq.startsWith(q)?0:(bq.includes(q)?1:2);
+        return as-bs || aq.localeCompare(bq,'en',{sensitivity:'base'});
+      })
       .slice(0,12);
     if(!items.length){
       menu.innerHTML=`<div class="autocomplete-empty">No matching college found</div>`;
@@ -527,7 +633,12 @@ function setupCollegeAutocomplete(inputId, menuId){
 
 function collegeMatches(x, query){
   if(!query) return true;
-  return norm(x._collegeSearch||x._college||"").includes(query);
+  const q=norm(query);
+  if(!q) return true;
+  const hay=norm([x._college||'',x._collegeSearch||'',x.college||'',x._collegeAliases||''].join(' '));
+  if(hay.includes(q)) return true;
+  const tokens=q.split(' ').filter(t=>t.length>2);
+  return tokens.length>=3 && tokens.every(t=>hay.includes(t));
 }
 
 function looksLikeSeatMarker(value){
@@ -710,75 +821,89 @@ function clearExplore(){
   document.getElementById("exploreBody").innerHTML=`<tr><td colspan="6">Enter a college, specialty or AIR limit and search.</td></tr>`;
 }
 
+function buildMovementRows(){
+  const rows=[];
+  for(const x of state.movement){
+    const colleges=extractCollegeCandidates(x.college);
+    const courses=extractCourseCandidates(x.course);
+    // Only accept movement rows where the extraction identifies one institute
+    // and one course. This prevents concatenated PDF cells from being falsely
+    // paired with each other.
+    if(colleges.length!==1 || courses.length!==1) continue;
+    const college=colleges[0], course=courses[0];
+    const item={_college:college,_course:course,_collegeSearch:norm([college,x.college].join(' '))};
+    for(const r of ['R1','R2','R3','STRAY']){
+      const count=Number(x[`allotment_count_${r}`]);
+      const o=Number(x[`opening_rank_${r}`]);
+      const c=Number(x[`closing_rank_${r}`]);
+      if(Number.isFinite(count)&&count>0) item[`allotment_count_${r}`]=(item[`allotment_count_${r}`]||0)+count;
+      if(Number.isFinite(o)&&o>0) item[`opening_rank_${r}`]=item[`opening_rank_${r}`]==null?o:Math.min(item[`opening_rank_${r}`],o);
+      if(Number.isFinite(c)&&c>0) item[`closing_rank_${r}`]=item[`closing_rank_${r}`]==null?c:Math.max(item[`closing_rank_${r}`],c);
+    }
+    if(!Object.keys(item).some(k=>k.startsWith('closing_rank_')||k.startsWith('opening_rank_'))) continue;
+    rows.push(item);
+  }
+  return rows;
+}
+
 function runMovement(){
-  trackEvent("movement_search", {
+  trackEvent('movement_search', {
     counselling: state.counselling,
     round: state.round,
-    college: document.getElementById("moveCollege").value.trim(),
-    course: document.getElementById("moveCourse").value.trim()
+    college: document.getElementById('moveCollege').value.trim(),
+    course: document.getElementById('moveCourse').value.trim()
   });
 
-  const selectedCollege=norm(document.getElementById("moveCollege").value);
-  const selectedCourse=norm(document.getElementById("moveCourse").value);
+  const selectedCollege=norm(document.getElementById('moveCollege').value);
+  const selectedCourse=norm(document.getElementById('moveCourse').value);
+  let rows=buildMovementRows();
 
-  // Rebuild movement from the cleaned allotment rows instead of the old movement
-  // CSV. The extracted AIQ movement table contains many page-fragment/concatenated
-  // institute names (for example ".154" and "Page No. 1545 ..."), so using it as
-  // the autocomplete source makes the UI unreliable. Allotment rows have the
-  // round-level AIR needed to calculate opening, closing and observed count.
-  const eligible=state.allotments.filter(x=>{
-    if(!x._college || !x._course) return false;
-    const status=norm(x.status||"");
-    if(/NOT ALLOTTED|NO ALLOTMENT|FRESH ALLOTTED IN/.test(status)) return false;
-    if(selectedCollege && !collegeMatches(x,selectedCollege)) return false;
-    if(selectedCourse && !norm(x._course).includes(selectedCourse)) return false;
-    return Number(x.rank_value)>0;
-  });
-
-  const groups=new Map();
-  for(const x of eligible){
-    const key=`${x.round}|${x._college}|${x._course}`;
-    const rank=Number(x.rank_value);
-    const g=groups.get(key)||{round:x.round,college:x._college,course:x._course,count:0,opening:Infinity,closing:-Infinity};
-    g.count+=1; g.opening=Math.min(g.opening,rank); g.closing=Math.max(g.closing,rank);
-    groups.set(key,g);
+  if(selectedCollege){
+    rows=rows.filter(x=>collegeMatches(x,selectedCollege));
+  }
+  if(selectedCourse){
+    rows=rows.filter(x=>norm(x._course).includes(selectedCourse));
   }
 
-  const byCollegeCourse=new Map();
-  for(const g of groups.values()){
-    const key=`${g.college}|${g.course}`;
-    const row=byCollegeCourse.get(key)||{_college:g.college,_course:g.course};
-    row[`allotment_count_${g.round}`]=g.count;
-    row[`opening_rank_${g.round}`]=g.opening;
-    row[`closing_rank_${g.round}`]=g.closing;
-    byCollegeCourse.set(key,row);
+  // Merge exact cleaned college+course pairs from multiple movement rows.
+  const merged=new Map();
+  for(const x of rows){
+    const key=`${norm(x._college)}|${norm(x._course)}`;
+    const g=merged.get(key)||{_college:x._college,_course:x._course,_collegeSearch:x._collegeSearch};
+    for(const r of ['R1','R2','R3','STRAY']){
+      if(x[`allotment_count_${r}`]) g[`allotment_count_${r}`]=(g[`allotment_count_${r}`]||0)+x[`allotment_count_${r}`];
+      if(Number.isFinite(x[`opening_rank_${r}`])) g[`opening_rank_${r}`]=g[`opening_rank_${r}`]==null?x[`opening_rank_${r}`]:Math.min(g[`opening_rank_${r}`],x[`opening_rank_${r}`]);
+      if(Number.isFinite(x[`closing_rank_${r}`])) g[`closing_rank_${r}`]=g[`closing_rank_${r}`]==null?x[`closing_rank_${r}`]:Math.max(g[`closing_rank_${r}`],x[`closing_rank_${r}`]);
+    }
+    merged.set(key,g);
   }
 
-  const rows=[...byCollegeCourse.values()].filter(x=>
-    (!selectedCollege||collegeMatches(x,selectedCollege)) &&
-    (!selectedCourse||norm(x._course).includes(selectedCourse))
-  );
-
+  rows=[...merged.values()];
   if(!rows.length){
-    document.getElementById("movementResults").hidden=true;
-    document.getElementById("movementEmpty").hidden=false;
-    document.getElementById("movementEmpty").textContent="No matching historical movement found. Try a broader college or course name.";
+    document.getElementById('movementResults').hidden=true;
+    document.getElementById('movementEmpty').hidden=false;
+    document.getElementById('movementEmpty').textContent='No matching historical movement found. Try selecting a clean college name and course.';
     return;
   }
 
-  const x=rows.sort((a,b)=>{
-    const ac=norm(a._college), bc=norm(b._college);
-    return ac.localeCompare(bc,"en",{sensitivity:"base"});
-  })[0];
+  // Prefer an exact college+course hit. If only a college is supplied, list the
+  // first matching course rather than silently mixing several courses.
+  rows.sort((a,b)=>{
+    const ea=(selectedCollege && norm(a._college)===selectedCollege?0:1)+(selectedCourse && norm(a._course)===selectedCourse?0:1);
+    const eb=(selectedCollege && norm(b._college)===selectedCollege?0:1)+(selectedCourse && norm(b._course)===selectedCourse?0:1);
+    return ea-eb || a._college.localeCompare(b._college,'en',{sensitivity:'base'}) || a._course.localeCompare(b._course,'en',{sensitivity:'base'});
+  });
 
-  document.getElementById("movementEmpty").hidden=true;
-  document.getElementById("movementResults").hidden=false;
-  document.getElementById("movementTitle").textContent=`${x._college||"Institute not available"} · ${x._course||"Course not available"}`;
-  const rounds=[["R1","Round 1"],["R2","Round 2"],["R3","Round 3"],["STRAY","Stray"]];
-  document.getElementById("movementRow").innerHTML=rounds.map(([r,label])=>{
+  const x=rows[0];
+  document.getElementById('movementEmpty').hidden=true;
+  document.getElementById('movementResults').hidden=false;
+  document.getElementById('movementTitle').textContent=`${x._college||'Institute not available'} · ${x._course||'Course not available'}`;
+  const rounds=[['R1','Round 1'],['R2','Round 2'],['R3','Round 3'],['STRAY','Stray']];
+  document.getElementById('movementRow').innerHTML=rounds.map(([r,label])=>{
     const o=x[`opening_rank_${r}`], c=x[`closing_rank_${r}`];
-    return `<div class="move-box"><small>${label}</small><strong>${Number.isFinite(o)&&Number.isFinite(c)?`${fmt(o)} – ${fmt(c)}`:"—"}</strong><span>${x[`allotment_count_${r}`]?fmt(x[`allotment_count_${r}`])+" allotments":"No observed data"}</span></div>`;
-  }).join("");
+    const has=Number.isFinite(o)&&Number.isFinite(c);
+    return `<div class="move-box"><small>${label}</small><strong>${has?`${fmt(o)} – ${fmt(c)}`:'—'}</strong><span>${x[`allotment_count_${r}`]?fmt(x[`allotment_count_${r}`])+' allotments':'No observed data'}</span></div>`;
+  }).join('');
 }
 
 function esc(s){
