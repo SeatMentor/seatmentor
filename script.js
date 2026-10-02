@@ -356,9 +356,18 @@ function cleanCollegeName(value){
   s=s.replace(/\b(CO-?EDUCATION|CO EDUCATION|PRIVATE|GOVT\.?|GOVERNMENT)\b/ig,"");
   s=s.replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/g,"");
   s=s.replace(/\b\d{6}\b/g,"");
+
+  // Remove PDF/page-number contamination before the real institute name.
+  s=s.replace(/^(?:PAGE|AGE|PAGE NO\.?|AGE NO\.?)\s*[:#.-]?\s*\d+\s*/i,"");
+  // Known OCR/extraction artefact: several movement rows contain truncated text
+  // immediately before a valid Dr. D. Y. Patil Medical College name.
+  s=s.replace(/^.*?((?:DR\.?\s*)?D\.?\s*Y\.?\s*PATIL\s+MEDICAL\s+COLLEGE)/i,"$1");
+
   s=s.replace(/\s+/g," ").replace(/^[-,\s]+|[-,\s]+$/g,"");
   const n=norm(s);
-  if(!n || /^(NOT ALLOTTED|ALLOTTED|GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC|AGAINST|JUMP OVER)/.test(n)) return "";
+  if(!n || /^(NOT ALLOTTED|ALLOTTED|GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|RADIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC|AGAINST|JUMP OVER)/.test(n)) return "";
+  if(/^(?:PAGE|AGE)\b|\bPAGE\s+NO\b|\bALLOTTED\s+CAT(?:EGORY)?\b|\bREMARKS?\b|\bSEAT\s+TYPE\b/i.test(n)) return "";
+
   // Stop at obvious address/contact fragments for AIQ-style cells.
   const parts=s.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean);
   if(parts.length>1){
@@ -375,6 +384,20 @@ function cleanCollegeName(value){
   s=s.replace(/\s{2,}/g," ").trim();
   if(s.length<3 || s.length>160) return "";
   return s;
+}
+
+function canonicalCollegeName(...values){
+  const raws=values.map(v=>String(v||"").trim()).filter(Boolean);
+  for(const raw of raws){
+    const c=cleanCollegeName(raw);
+    if(!c) continue;
+    const n=norm(c);
+    if(/(?:^|\s)(?:DR\.?\s*)?D\.?\s*Y\.?\s*PATIL\s+MEDICAL\s+COLLEGE(?:$|\s|,)/.test(n)) {
+      return "Dr. D. Y. Patil Medical College";
+    }
+    return c;
+  }
+  return "";
 }
 
 function looksLikeSeatMarker(value){
@@ -413,8 +436,8 @@ function normalizeRecord(x){
   // are shifted: college = seat marker, course = institute, category = branch.
   // Use all three fields only when a value actually looks like a course/institute.
   const course=canonicalCourse(rawCourse,rawCategory,rawCollege);
-  const collegeA=cleanCollegeName(rawCollege);
-  const collegeB=cleanCollegeName(rawCourse);
+  const collegeA=canonicalCollegeName(rawCollege);
+  const collegeB=canonicalCollegeName(rawCourse);
 
   let college=collegeA;
   if(looksLikeSeatMarker(rawCollege) && collegeB && !looksLikeRemark(rawCourse) && !canonicalCourse(rawCourse)) college=collegeB;
@@ -426,7 +449,7 @@ function normalizeRecord(x){
 
 function normalizeDataset(rows){ return rows.map(normalizeRecord); }
 
-function isCollegeLike(v){ return !!cleanCollegeName(v); }
+function isCollegeLike(v){ return !!canonicalCollegeName(v); }
 
 function populateCollegeOptions(){
   const list=document.getElementById("collegeOptions");
