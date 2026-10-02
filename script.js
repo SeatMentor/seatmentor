@@ -114,17 +114,37 @@ async function loadDataset(){
   }
 }
 
+const COLLEGE_STATES = [
+  "Andaman & Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu & Kashmir","Jharkhand","Karnataka","Kerala","Ladakh","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Puducherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"
+];
+
+// AIQ allotment rows carry "All India" in the source-state field. For the
+// candidate-facing State filter we derive the physical college state from
+// explicit state names present in the extracted institute text. For state
+// counselling files, the counselling state is used as the college-state
+// fallback because those files are state-specific.
+function deriveCollegeState(x){
+  const sourceState=String(x.state||"").trim();
+  if(state.counselling!=="AIQ" && sourceState && sourceState!=="All India") return sourceState;
+  const t=norm(x.college||"");
+  const aliases=[
+    ["ANDAMAN AND NICOBAR ISLANDS","Andaman & Nicobar Islands"],["ANDHRA PRADESH","Andhra Pradesh"],["ARUNACHAL PRADESH","Arunachal Pradesh"],["ASSAM","Assam"],["BIHAR","Bihar"],["CHANDIGARH","Chandigarh"],["CHHATTISGARH","Chhattisgarh"],["DELHI","Delhi"],["NEW DELHI","Delhi"],["GOA","Goa"],["GUJARAT","Gujarat"],["HARYANA","Haryana"],["HIMACHAL PRADESH","Himachal Pradesh"],["JAMMU AND KASHMIR","Jammu & Kashmir"],["JAMMU KASHMIR","Jammu & Kashmir"],["JHARKHAND","Jharkhand"],["KARNATAKA","Karnataka"],["KERALA","Kerala"],["LADAKH","Ladakh"],["LAKSHADWEEP","Lakshadweep"],["MADHYA PRADESH","Madhya Pradesh"],["MAHARASHTRA","Maharashtra"],["MANIPUR","Manipur"],["MEGHALAYA","Meghalaya"],["MIZORAM","Mizoram"],["NAGALAND","Nagaland"],["ODISHA","Odisha"],["ORISSA","Odisha"],["PUDUCHERRY","Puducherry"],["PONDICHERRY","Puducherry"],["PUNJAB","Punjab"],["RAJASTHAN","Rajasthan"],["SIKKIM","Sikkim"],["TAMIL NADU","Tamil Nadu"],["TELANGANA","Telangana"],["TRIPURA","Tripura"],["UTTAR PRADESH","Uttar Pradesh"],["UTTARAKHAND","Uttarakhand"],["WEST BENGAL","West Bengal"]
+  ];
+  for(const [needle,label] of aliases){ if(t.includes(needle)) return label; }
+  return "";
+}
+
 function populateRankStateOptions(){
   const sel=document.getElementById("rankState");
-  const values=[...new Set(currentAllotments().map(x=>String(x.state||"").trim()).filter(Boolean))].sort();
-  sel.innerHTML=`<option value="ALL">All states</option>` + values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  sel.innerHTML=`<option value="ALL">All college states</option>` + COLLEGE_STATES.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  if(!sel.value) sel.value="ALL";
 }
 
 function rankFilteredAllotments(){
   const selectedState=document.getElementById("rankState").value;
   const selectedCategory=document.getElementById("rankCategory").value;
   let rows=currentAllotments();
-  if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>String(x.state||"").trim()===selectedState);
+  if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>deriveCollegeState(x)===selectedState);
   if(selectedCategory && selectedCategory!=="ALL") rows=rows.filter(x=>cleanCategory(x.category)===selectedCategory);
   return rows.filter(x=>Number(x.rank_value)>0 && x.college && x.course);
 }
@@ -164,7 +184,7 @@ function runRank(){
 
   document.getElementById("rankEmpty").hidden=true;
   document.getElementById("rankResults").hidden=false;
-  const stateLabel=document.getElementById("rankState").selectedOptions[0]?.textContent||"All states";
+  const stateLabel=document.getElementById("rankState").selectedOptions[0]?.textContent||"All college states";
   const categoryLabel=document.getElementById("rankCategory").selectedOptions[0]?.textContent||"All categories";
   document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
   document.getElementById("rankResultCount").textContent=`${fmt(rows.length)} historical matches · ${stateLabel} · ${categoryLabel}`;
@@ -178,7 +198,7 @@ function runRank(){
     return `<article class="rank-item">
       <span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span>
       <h4>${esc(x.course||"Course not available")}</h4>
-      <p>${esc(x.college||"Institute not available")}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p>
+      <p>${esc(x.college||"Institute not available")}${deriveCollegeState(x)?` · ${esc(deriveCollegeState(x))}`:""}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p>
       <div class="rank-metrics">
         <div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div>
         <div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div>
