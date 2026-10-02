@@ -101,6 +101,7 @@ async function loadDataset(){
     state.allotments=a; state.cutoffs=c; state.movement=m; state.loaded=true;
     setRoundOptions(a);
     populateRankStateOptions();
+    populateRankCourseOptions();
     setCategoryOptions();
     document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
     document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
@@ -132,6 +133,16 @@ function deriveCollegeState(x){
   ];
   for(const [needle,label] of aliases){ if(t.includes(needle)) return label; }
   return "";
+}
+
+function populateRankCourseOptions(){
+  const sel=document.getElementById("rankCourse");
+  if(!sel) return;
+  const previous=sel.value;
+  const courses=[...new Set(currentAllotments().map(x=>String(x.course||"").trim()).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
+  sel.innerHTML=`<option value="">All courses</option>` + courses.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  sel.value=courses.includes(previous)?previous:"";
 }
 
 function populateRankStateOptions(){
@@ -259,6 +270,7 @@ document.getElementById("counselling").addEventListener("change",async e=>{
 document.getElementById("round").addEventListener("change",e=>{
   state.round=e.target.value;
   populateRankStateOptions();
+  populateRankCourseOptions();
   document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
   clearExplore();
 });
