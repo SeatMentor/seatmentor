@@ -112,7 +112,7 @@
       </label>
       <label>
         <span>College <em>optional</em></span>
-        <input id="rankCollege" list="collegeOptions" placeholder="Start typing a college">
+        <div class="autocomplete-host"><input id="rankCollege" autocomplete="off" spellcheck="false" placeholder="Start typing a college"><div id="rankCollegeMenu" class="autocomplete-menu" hidden></div></div>
       </label>
       <button id="rankSearch" class="primary">Find my historical range <b>→</b></button>
     </div>
@@ -153,7 +153,7 @@
     <div class="explore-controls">
       <label>
         <span>College / Institute</span>
-        <input id="searchCollege" list="collegeOptions" placeholder="Start typing a college">
+        <div class="autocomplete-host"><input id="searchCollege" autocomplete="off" spellcheck="false" placeholder="Start typing a college"><div id="searchCollegeMenu" class="autocomplete-menu" hidden></div></div>
       </label>
       <label>
         <span>Specialty / Course</span>
@@ -201,7 +201,7 @@
 
   <div class="movement-card">
     <div class="movement-controls">
-      <label><span>College / Institute</span><input id="moveCollege" list="collegeOptions" placeholder="Start typing a college"></label>
+      <label><span>College / Institute</span><div class="autocomplete-host"><input id="moveCollege" autocomplete="off" spellcheck="false" placeholder="Start typing a college"><div id="moveCollegeMenu" class="autocomplete-menu" hidden></div></div></label>
       <label><span>Course</span><input id="moveCourse" list="courseOptions" placeholder="Start typing a course"></label>
       <button id="moveSearch" class="secondary">Show movement</button>
     </div>
@@ -281,12 +281,11 @@
   </div>
 </div>
 
-  <datalist id="collegeOptions"></datalist>
   <datalist id="courseOptions"></datalist>
 
 </main>
 
 <footer>SeatMentor · 2025 counselling intelligence · Historical data explorer</footer>
-<script src="script.js?v=22"></script>
+<script src="script.js?v=28"></script>
 </body>
 </html>

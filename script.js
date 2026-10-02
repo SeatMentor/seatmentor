@@ -29,7 +29,7 @@ const PATHS = {
   JHARKHAND: {label:"Jharkhand", allotment:"data/allotment/jharkhand.csv", cutoff:"data/cutoff/jharkhand.csv", movement:"data/movement/jharkhand.csv"}
 };
 
-const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], loaded:false };
+const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], collegeMaster:[], loaded:false };
 
 // Optional: after creating a Formspree form, paste its endpoint here.
 // Example: https://formspree.io/f/abcdwxyz
@@ -347,75 +347,187 @@ function canonicalCourse(...values){
   return "";
 }
 
+// ---------------------------------------------------------------------------
+// College / institute cleaning + autocomplete
+// The source PDFs contain repeated addresses, page fragments, OCR damage and
+// concatenated neighbouring cells. We keep the underlying source untouched,
+// but expose a clean candidate-facing college name and a search alias set.
+// ---------------------------------------------------------------------------
+const COLLEGE_ALIASES = [
+  [/INDIRA\s+GANDHI\s+INSTITUTE\s+(?:OF|O)?\s*MEDICAL\s+SCIEN.*/i, "Indira Gandhi Institute of Medical Sciences"],
+  [/MAHATMA\s+GANDHI\s+CANCER\s+HOSPITAL.*/i, "Mahatma Gandhi Cancer Hospital and Research Institute"],
+  [/(?:DR\.?\s*)?D\.?\s*Y\.?\s*PATIL\s+MEDICAL\s+COLLEGE.*/i, "Dr. D. Y. Patil Medical College"],
+  [/SHRI\.?\s*B\.?\s*M\.?\s*PATIL\s+MEDICAL\s+COLLEGE.*/i, "Shri B. M. Patil Medical College Hospital and Research Centre"],
+  [/SHRI\s+VASANTRAO\s+NAIK.*MEDICAL\s+COLLEGE.*YAVATMAL/i, "Shri Vasantrao Naik Govt. Medical College, Yavatmal"],
+  [/PANDIT\s+DINDAYAL\s+UPADHYAY\s+MEDICAL\s+COLLEGE.*RAJKOT/i, "Pandit Dindayal Upadhyay Medical College, Rajkot"],
+  [/MAULANA\s+AZAD\s+MEDICAL\s+COLLEGE/i, "Maulana Azad Medical College"],
+  [/^(?:NIL\s+)?RATAN\s+SIRCAR\s+MEDICAL\s+COLLEGE/i, "Nil Ratan Sircar Medical College"],
+  [/RAVINDRA\s+NATH\s+TAGORE\s+MEDICAL\s+COLLEGE/i, "Ravindra Nath Tagore Medical College"],
+  [/JASLOK\s+HOSPITAL/i, "Jaslok Hospital and Research Centre"],
+  [/AIG\s+HOSPITAL/i, "AIG Hospitals"],
+  [/K\.?\s*S\.?\s*HEGDE\s+MEDICAL\s+ACADEMY/i, "K. S. Hegde Medical Academy"],
+  [/PGIMER/i, "PGIMER"],
+  [/JIPMER/i, "JIPMER"],
+  [/AIIMS\s+(?:NEW\s+DELHI|DELHI)/i, "AIIMS New Delhi"],
+  [/GURU\s+GOBIND\s+SINGH\s+MEDICAL\s+COLLEGE.*FARIDKOT/i, "Guru Gobind Singh Medical College, Faridkot"],
+  [/GANDHI\s+MEDICAL\s+COLLEGE.*BHOPAL/i, "Gandhi Medical College, Bhopal"],
+  [/PATNA\s+MEDICAL\s+COLLEGE/i, "Patna Medical College"],
+  [/DARBHANGA\s+MEDICAL\s+COLLEGE/i, "Darbhanga Medical College"],
+  [/ANUGRAH\s+NARAYAN\s+MAGADH\s+MEDICAL\s+COLLEGE/i, "Anugrah Narayan Magadh Medical College, Gaya"],
+  [/S\.K\.M\.C\.\s*MUZAFFARPUR/i, "S.K.M.C. Muzaffarpur"],
+  [/D\.M\.C\.\s*LAHERIASARAI/i, "D.M.C. Laheriasarai"],
+  [/P\.M\.C\.\s*PATNA/i, "P.M.C. Patna"],
+  [/N\.M\.C(?:\s*&\.?H|\s*\.?H)?\.?\s*SASARAM/i, "N.M.C. & H., Sasaram"],
+  [/N\.M\.C\.\s*PATNA/i, "N.M.C. Patna"],
+  [/I\.G\.I\.M\.S\.\s*PATNA/i, "I.G.I.M.S. Patna"],
+  [/G\.M\.C\.?\s*,?\s*BETTIAH/i, "G.M.C., Bettiah"]
+];
+
+function stripCollegeJunkStart(s){
+  let out=s;
+  for(let i=0;i<4;i++){
+    out=out.replace(/^[\s,._-]+/g,"");
+    out=out.replace(/^(?:PAGE|AGE)\s*NO\.?\s*[:#.-]?\s*\d+\s*/i,"");
+    out=out.replace(/^\d+(?:\s*[-.:_]+\s*)+/i,"");
+    out=out.replace(/^(?:QUOTA|MERIT|FINANCED|FRESH\s+ALLOTMENT|SEAT)\s+/i,"");
+    out=out.replace(/^(?:anced|nced|ced|inanced|ia|ana|ndia|dia|ndit|vindra|lhi|ity)\s+/i,"");
+  }
+  out=out.replace(/^-+(?:\s*-+)+/g,"").trim();
+  return out;
+}
+
+function applyCollegeAlias(s){
+  const n=norm(s);
+  for(const [re,name] of COLLEGE_ALIASES){
+    if(re.test(n)) return name;
+  }
+  return "";
+}
+
 function cleanCollegeName(value){
   let s=String(value||"").replace(/\uFEFF/g,"").trim();
   if(!s) return "";
   s=s.replace(/[\u2013\u2014]/g,"-").replace(/\s+/g," ");
-  s=s.replace(/\b[\w.+-]+@[\w.-]+\.[A-Z]{2,}\b/ig,"");
-  s=s.replace(/\[[^\]]*\]/g,"");
-  s=s.replace(/\b(CO-?EDUCATION|CO EDUCATION|PRIVATE|GOVT\.?|GOVERNMENT)\b/ig," ");
-  s=s.replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/g,"");
-  s=s.replace(/\b\d{6}\b/g,"");
 
-  // Normalise common PDF/OCR prefixes such as "- - Page No. 1545",
-  // "2343 - dia ...", "ia ...", and similar fragments.
-  s=s.replace(/^[\s,._-]+/g,"");
-  s=s.replace(/^(?:PAGE|AGE|PAGE NO\.?|AGE NO\.?)\s*[:#.-]?\s*\d+\s*/i,"");
-  s=s.replace(/^\d+(?:\s*[-.:]\s*)+/i,"");
-  s=s.replace(/^(?:dia|ia|ndia|ndian)\s+/i,"");
+  // Remove page tails first. These are frequent in AIQ extraction.
+  s=s.replace(/\s*(?:PAGE|AGE)\s*NO\.?\s*[:#.-]?\s*\d+.*$/i,"");
+  s=stripCollegeJunkStart(s);
 
-  // Strip page-number fragments that appear before the actual institute name.
-  s=s.replace(/^.*?((?:DR\.?\s*)?D\.?\s*Y\.?\s*PATIL\s+MEDICAL\s+COLLEGE)/i,"$1");
-  s=s.replace(/^.*?((?:SHRI\s+)?VASANTRAO\s+NAIK\s+GOVT\.?\s+MEDICAL\s+COLLEGE)/i,"$1");
-  s=s.replace(/^.*?(GAUHATI\s+MEDICAL\s+COLLEGE)/i,"$1");
-  s=s.replace(/^.*?(GOVERNMENT\s+MEDICAL\s+COLLEGE)/i,"$1");
+  // Correct common OCR splits before selecting the display name.
+  s=s.replace(/\bCollge\b/ig,"College")
+      .replace(/\bMedic\b/ig,"Medical")
+      .replace(/\bScienc(?:e)?s?\b/ig,"Sciences")
+      .replace(/\bInsti?tute\b/ig,"Institute")
+      .replace(/\bO\s+Medical\b/ig,"of Medical")
+      .replace(/\s{2,}/g," ").trim();
 
-  s=s.replace(/\s+/g," ").replace(/^[-,\s]+|[-,\s]+$/g,"");
-  const n=norm(s);
+  // Exact/near-exact known aliases win over generic extraction.
+  const alias=applyCollegeAlias(s);
+  if(alias) return alias;
 
-  // Hard reject pagination/seat-only fragments. These are not valid institute names.
-  if(!n || /^\d+(?:\s*\d+)*$/.test(n)) return "";
-  if(!/[A-Z]{3,}/.test(n)) return "";
-  if(/^(NOT ALLOTTED|ALLOTTED|GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|RADIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC|AGAINST|JUMP OVER)/.test(n)) return "";
-  if(/(?:PAGE|AGE)\s+NO|ALLOTTED\s+CAT(?:EGORY)?|REMARKS?|SEAT\s+TYPE/.test(n)) return "";
+  // The first comma-separated segment is usually the institute name; the rest
+  // is typically address / city / contact information or a repeated institute.
+  let first=(s.split(/\s*,\s*/)[0]||s).trim();
+  first=stripCollegeJunkStart(first);
+  const firstAlias=applyCollegeAlias(first);
+  if(firstAlias) return firstAlias;
 
-  // Reject strings that are mostly a page number/address artifact.
-  const digits=(s.match(/\d/g)||[]).length;
-  const letters=(s.match(/[A-Za-z]/g)||[]).length;
-  if(digits>6 && digits>letters*0.35) return "";
+  // Remove obvious extraction words if they survived in the first segment.
+  first=first.replace(/\b(?:PAGE|AGE)\s+NO\b.*$/i,"")
+             .replace(/\b(?:AGAINST|JUMP|OVER|SEAT|CATEGORY|ALLOTTED)\b.*$/i,"")
+             .replace(/\s{2,}/g," ").trim();
 
-  // Stop at obvious address/contact fragments for AIQ-style cells.
-  const parts=s.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean);
-  if(parts.length>1){
-    let acc=[];
-    for(const part of parts){
-      const pn=norm(part);
-      if(/@|\b(?:ROAD|MARG|SALAI|NAGAR|PLACE|DISTRICT|PIN|ZIP)\b|\b\d{6}\b/.test(pn)) break;
-      acc.push(part);
-      const joined=norm(acc.join(" "));
-      if(/MEDICAL\s+COLLEGE|MEDICAL\s+UNIVERSITY|MEDICAL\s+INSTITUTE|INSTITUTE\s+OF\s+MEDICAL|PGIMER|AIIMS|JIPMER/.test(joined)) break;
-      if(acc.length>=3) break;
-    }
-    if(acc.length) s=acc.join(", ");
-  }
+  if(!first || first.length<3) return "";
+  if(/^[._\-\s\d]+$/.test(first)) return "";
+  if(/^(?:GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|RADIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC)$/i.test(first)) return "";
+  if(!/[A-Za-z]{3,}/.test(first)) return "";
+  return first.replace(/^[-\s,._]+|[-\s,._]+$/g,"").trim();
+}
 
-  s=s.replace(/\s{2,}/g," ").trim();
-  if(s.length<3 || s.length>160) return "";
-  return s;
+function collegeSearchTerms(raw, display, stateName){
+  const terms=[display, stateName];
+  const s=String(raw||"");
+  const chunks=s.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean).slice(0,5);
+  for(const c of chunks) if(c.length>=3 && !/^(?:PAGE|AGE)\s+NO\b/i.test(c)) terms.push(c);
+  return norm(terms.join(" "));
 }
 
 function canonicalCollegeName(...values){
   const raws=values.map(v=>String(v||"").trim()).filter(Boolean);
   for(const raw of raws){
     const c=cleanCollegeName(raw);
-    if(!c) continue;
-    const n=norm(c);
-    if(/(?:^|\s)(?:DR\.?\s*)?D\.?\s*Y\.?\s*PATIL\s+MEDICAL\s+COLLEGE(?:$|\s|,)/.test(n)) {
-      return "Dr. D. Y. Patil Medical College";
-    }
-    return c;
+    if(c) return c;
   }
   return "";
+}
+
+function buildCollegeMaster(){
+  const map=new Map();
+  for(const x of state.allotments){
+    const name=x._college;
+    if(!name) continue;
+    const key=norm(name);
+    if(!key) continue;
+    let item=map.get(key);
+    if(!item){
+      item={name,search:new Set()};
+      map.set(key,item);
+    }
+    item.search.add(norm(name));
+    item.search.add(x._collegeSearch||"");
+  }
+  state.collegeMaster=[...map.values()]
+    .map(x=>({...x,searchText:[...x.search].filter(Boolean).join(" ")}))
+    .sort((a,b)=>a.name.localeCompare(b.name,"en",{sensitivity:"base"}));
+}
+
+function setupCollegeAutocomplete(inputId, menuId){
+  const input=document.getElementById(inputId), menu=document.getElementById(menuId);
+  if(!input||!menu) return;
+  const host=input.parentElement;
+  let activeIndex=-1;
+
+  function close(){ menu.hidden=true; activeIndex=-1; }
+  function render(){
+    const q=norm(input.value);
+    const items=state.collegeMaster
+      .filter(x=>!q || norm(x.searchText).includes(q))
+      .slice(0,12);
+    if(!items.length){
+      menu.innerHTML=`<div class="autocomplete-empty">No matching college found</div>`;
+      menu.hidden=false;
+      return;
+    }
+    menu.innerHTML=items.map((x,i)=>`<button type="button" class="autocomplete-option" data-name="${esc(x.name)}" data-index="${i}">${esc(x.name)}</button>`).join("");
+    menu.hidden=false;
+    activeIndex=-1;
+  }
+  function choose(name){
+    input.value=name;
+    input.dataset.selectedCollege=name;
+    close();
+    input.dispatchEvent(new Event("change",{bubbles:true}));
+  }
+  input.addEventListener("focus",render);
+  input.addEventListener("input",()=>{delete input.dataset.selectedCollege; render();});
+  input.addEventListener("keydown",e=>{
+    if(menu.hidden) return;
+    const options=[...menu.querySelectorAll(".autocomplete-option")];
+    if(e.key==="ArrowDown"){e.preventDefault();activeIndex=Math.min(activeIndex+1,options.length-1);options.forEach((o,i)=>o.classList.toggle("active",i===activeIndex));}
+    else if(e.key==="ArrowUp"){e.preventDefault();activeIndex=Math.max(activeIndex-1,0);options.forEach((o,i)=>o.classList.toggle("active",i===activeIndex));}
+    else if(e.key==="Enter" && activeIndex>=0){e.preventDefault();choose(options[activeIndex].dataset.name);}
+    else if(e.key==="Escape") close();
+  });
+  menu.addEventListener("mousedown",e=>{
+    const btn=e.target.closest(".autocomplete-option");
+    if(btn){e.preventDefault();choose(btn.dataset.name);}
+  });
+  document.addEventListener("click",e=>{ if(!host.contains(e.target)) close(); });
+}
+
+function collegeMatches(x, query){
+  if(!query) return true;
+  return norm(x._collegeSearch||x._college||"").includes(query);
 }
 
 function looksLikeSeatMarker(value){
@@ -450,9 +562,6 @@ function normalizeRecord(x){
   const rawCourse=String(x.course||"");
   const rawCategory=String(x.category||"");
 
-  // Bihar PDFs use INSTITUTE + BRANCH, but a subset of extracted Round-1/3 rows
-  // are shifted: college = seat marker, course = institute, category = branch.
-  // Use all three fields only when a value actually looks like a course/institute.
   const course=canonicalCourse(rawCourse,rawCategory,rawCollege);
   const collegeA=canonicalCollegeName(rawCollege);
   const collegeB=canonicalCollegeName(rawCourse);
@@ -462,7 +571,8 @@ function normalizeRecord(x){
   if(!college && collegeB && !looksLikeRemark(rawCourse)) college=collegeB;
   if(canonicalCourse(rawCollege) && looksLikeRemark(rawCourse)) college="";
 
-  return {...x,_college:college,_course:course,_category:cleanRowCategory(x)};
+  const collegeSearch=collegeSearchTerms(rawCollege,college,x.state||"");
+  return {...x,_college:college,_course:course,_category:cleanRowCategory(x),_collegeSearch:collegeSearch};
 }
 
 function normalizeDataset(rows){ return rows.map(normalizeRecord); }
@@ -470,11 +580,7 @@ function normalizeDataset(rows){ return rows.map(normalizeRecord); }
 function isCollegeLike(v){ return !!canonicalCollegeName(v); }
 
 function populateCollegeOptions(){
-  const list=document.getElementById("collegeOptions");
-  if(!list) return;
-  const vals=[...new Set(state.allotments.map(x=>x._college).filter(Boolean))]
-    .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
-  list.innerHTML=vals.map(v=>`<option value="${esc(v)}"></option>`).join("");
+  buildCollegeMaster();
 }
 
 function populateCourseDatalist(){
@@ -533,7 +639,7 @@ function runRank(){
   const category=document.getElementById("rankCategory").value;
   let source=rankFilteredAllotments();
   if(course) source=source.filter(x=>x._course===document.getElementById("rankCourse").value);
-  if(college) source=source.filter(x=>norm(x._college||"").includes(college));
+  if(college) source=source.filter(x=>collegeMatches(x,college));
 
   // Derive observed closing AIR from the selected round's actual allotments.
   // This keeps category/state filters tied to the same round instead of mixing rounds.
@@ -589,7 +695,7 @@ function runExplore(){
   const course=norm(document.getElementById("searchCourse").value);
   const maxAir=Number(document.getElementById("searchMaxAir").value)||Infinity;
   let rows=currentAllotments().filter(x=>Number(x.rank_value)<=maxAir);
-  if(college) rows=rows.filter(x=>norm(x._college||"").includes(college));
+  if(college) rows=rows.filter(x=>collegeMatches(x,college));
   if(course) rows=rows.filter(x=>norm(x._course||"").includes(course));
   rows.sort((a,b)=>Number(a.rank_value)-Number(b.rank_value));
   rows=rows.slice(0,250);
@@ -624,7 +730,7 @@ function runMovement(){
     if(!x._college || !x._course) return false;
     const status=norm(x.status||"");
     if(/NOT ALLOTTED|NO ALLOTMENT|FRESH ALLOTTED IN/.test(status)) return false;
-    if(selectedCollege && !norm(x._college).includes(selectedCollege)) return false;
+    if(selectedCollege && !collegeMatches(x,selectedCollege)) return false;
     if(selectedCourse && !norm(x._course).includes(selectedCourse)) return false;
     return Number(x.rank_value)>0;
   });
@@ -649,7 +755,7 @@ function runMovement(){
   }
 
   const rows=[...byCollegeCourse.values()].filter(x=>
-    (!selectedCollege||norm(x._college).includes(selectedCollege)) &&
+    (!selectedCollege||collegeMatches(x,selectedCollege)) &&
     (!selectedCourse||norm(x._course).includes(selectedCourse))
   );
 
@@ -706,6 +812,10 @@ document.querySelectorAll(".chips button").forEach(b=>b.addEventListener("click"
 document.getElementById("myRank").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
 document.getElementById("rankCourse").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
 document.getElementById("rankCollege").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
+
+setupCollegeAutocomplete("rankCollege","rankCollegeMenu");
+setupCollegeAutocomplete("searchCollege","searchCollegeMenu");
+setupCollegeAutocomplete("moveCollege","moveCollegeMenu");
 
 function feedbackContext(){
   const counselling = document.getElementById("counselling")?.selectedOptions?.[0]?.textContent || "—";
