@@ -209,7 +209,7 @@ const EXACT_COURSE_MAP = [
 // the institute name has a strong, recognizable signal; otherwise it stays
 // unclassified and remains visible under "All institutes".
 const GOVERNMENT_INSTITUTE_PATTERNS = [
-  /AIIMS|ALL INDIA INSTITUTE OF MEDICAL SCIENCES/,
+  /\bAIIMS\b|ALL INDIA INSTITUTE OF MEDICAL SCIENCES/,
   /GOVT|GOVERNMENT|AUTONOMOUS STATE MEDICAL COLLEGE/,
   /PGIMER|JIPMER|VMMC|SAFDARJUNG|RAM MANOHAR LOHIA/,
   /I\.G\.I\.M\.S|IGIMS/,
@@ -262,7 +262,7 @@ function deriveInstituteType(x){
   if(GOVERNMENT_INSTITUTE_PATTERNS.some(re=>re.test(n))) return "GOVERNMENT";
   if(PRIVATE_INSTITUTE_PATTERNS.some(re=>re.test(n))) return "PRIVATE";
   // Strong corporate/private indicators in extracted institute names.
-  if(/(PRIVATE|PVT|TRUST|FOUNDATION|INSTITUTE OF MEDICAL SCIENCES AND RESEARCH|MEDICAL COLLEGE.*HOSPITAL)/.test(n) && !/GOVERNMENT|GOVT/.test(n)) return "PRIVATE";
+  if(/\b(PRIVATE|PVT|TRUST|FOUNDATION|INSTITUTE OF MEDICAL SCIENCES AND RESEARCH|MEDICAL COLLEGE.*HOSPITAL)\b/.test(n) && !/GOVERNMENT|GOVT/.test(n)) return "PRIVATE";
   return "";
 }
 
@@ -353,34 +353,52 @@ function cleanCollegeName(value){
   s=s.replace(/[\u2013\u2014]/g,"-").replace(/\s+/g," ");
   s=s.replace(/\b[\w.+-]+@[\w.-]+\.[A-Z]{2,}\b/ig,"");
   s=s.replace(/\[[^\]]*\]/g,"");
-  s=s.replace(/\b(CO-?EDUCATION|CO EDUCATION|PRIVATE|GOVT\.?|GOVERNMENT)\b/ig,"");
+  s=s.replace(/\b(CO-?EDUCATION|CO EDUCATION|PRIVATE|GOVT\.?|GOVERNMENT)\b/ig," ");
   s=s.replace(/\b\d{1,2}[-/]\d{1,2}[-/]\d{4}\b/g,"");
   s=s.replace(/\b\d{6}\b/g,"");
 
-  // Remove PDF/page-number contamination before the real institute name.
+  // Normalise common PDF/OCR prefixes such as "- - Page No. 1545",
+  // "2343 - dia ...", "ia ...", and similar fragments.
+  s=s.replace(/^[\s,._-]+/g,"");
   s=s.replace(/^(?:PAGE|AGE|PAGE NO\.?|AGE NO\.?)\s*[:#.-]?\s*\d+\s*/i,"");
-  // Known OCR/extraction artefact: several movement rows contain truncated text
-  // immediately before a valid Dr. D. Y. Patil Medical College name.
+  s=s.replace(/^\d+(?:\s*[-.:]\s*)+/i,"");
+  s=s.replace(/^(?:dia|ia|ndia|ndian)\s+/i,"");
+
+  // Strip page-number fragments that appear before the actual institute name.
   s=s.replace(/^.*?((?:DR\.?\s*)?D\.?\s*Y\.?\s*PATIL\s+MEDICAL\s+COLLEGE)/i,"$1");
+  s=s.replace(/^.*?((?:SHRI\s+)?VASANTRAO\s+NAIK\s+GOVT\.?\s+MEDICAL\s+COLLEGE)/i,"$1");
+  s=s.replace(/^.*?(GAUHATI\s+MEDICAL\s+COLLEGE)/i,"$1");
+  s=s.replace(/^.*?(GOVERNMENT\s+MEDICAL\s+COLLEGE)/i,"$1");
 
   s=s.replace(/\s+/g," ").replace(/^[-,\s]+|[-,\s]+$/g,"");
   const n=norm(s);
-  if(!n || /^(NOT ALLOTTED|ALLOTTED|GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|RADIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC|AGAINST|JUMP OVER)/.test(n)) return "";
-  if(/^(?:PAGE|AGE)\b|\bPAGE\s+NO\b|\bALLOTTED\s+CAT(?:EGORY)?\b|\bREMARKS?\b|\bSEAT\s+TYPE\b/i.test(n)) return "";
+
+  // Hard reject pagination/seat-only fragments. These are not valid institute names.
+  if(!n || /^\d+(?:\s*\d+)*$/.test(n)) return "";
+  if(!/[A-Z]{3,}/.test(n)) return "";
+  if(/^(NOT ALLOTTED|ALLOTTED|GENERAL MEDICINE|GENERAL SURGERY|PAEDIATRICS|ANAESTHESIOLOGY|PATHOLOGY|MICROBIOLOGY|RADIOLOGY|OPHTHALMOLOGY|ORTHOPAEDICS|DERMATOLOGY|EWS|OBC|SC|ST|UR|BC|EBC|AGAINST|JUMP OVER)/.test(n)) return "";
+  if(/(?:PAGE|AGE)\s+NO|ALLOTTED\s+CAT(?:EGORY)?|REMARKS?|SEAT\s+TYPE/.test(n)) return "";
+
+  // Reject strings that are mostly a page number/address artifact.
+  const digits=(s.match(/\d/g)||[]).length;
+  const letters=(s.match(/[A-Za-z]/g)||[]).length;
+  if(digits>6 && digits>letters*0.35) return "";
 
   // Stop at obvious address/contact fragments for AIQ-style cells.
   const parts=s.split(/\s*,\s*/).map(x=>x.trim()).filter(Boolean);
   if(parts.length>1){
     let acc=[];
-    for(const p of parts){
-      const pn=norm(p);
+    for(const part of parts){
+      const pn=norm(part);
       if(/@|\b(?:ROAD|MARG|SALAI|NAGAR|PLACE|DISTRICT|PIN|ZIP)\b|\b\d{6}\b/.test(pn)) break;
-      acc.push(p);
-      if(/MEDICAL\s+COLLEGE|MEDICAL\s+UNIVERSITY|MEDICAL\s+INSTITUTE|INSTITUTE\s+OF\s+MEDICAL|PGIMER|AIIMS/.test(norm(acc.join(" ")))) break;
+      acc.push(part);
+      const joined=norm(acc.join(" "));
+      if(/MEDICAL\s+COLLEGE|MEDICAL\s+UNIVERSITY|MEDICAL\s+INSTITUTE|INSTITUTE\s+OF\s+MEDICAL|PGIMER|AIIMS|JIPMER/.test(joined)) break;
       if(acc.length>=3) break;
     }
     if(acc.length) s=acc.join(", ");
   }
+
   s=s.replace(/\s{2,}/g," ").trim();
   if(s.length<3 || s.length>160) return "";
   return s;
@@ -593,22 +611,67 @@ function runMovement(){
     college: document.getElementById("moveCollege").value.trim(),
     course: document.getElementById("moveCourse").value.trim()
   });
-  const college=norm(document.getElementById("moveCollege").value);
-  const course=norm(document.getElementById("moveCourse").value);
-  let rows=state.movement.filter(x=>(!college||norm(x._college||"").includes(college))&&(!course||norm(x._course||"").includes(course)));
+
+  const selectedCollege=norm(document.getElementById("moveCollege").value);
+  const selectedCourse=norm(document.getElementById("moveCourse").value);
+
+  // Rebuild movement from the cleaned allotment rows instead of the old movement
+  // CSV. The extracted AIQ movement table contains many page-fragment/concatenated
+  // institute names (for example ".154" and "Page No. 1545 ..."), so using it as
+  // the autocomplete source makes the UI unreliable. Allotment rows have the
+  // round-level AIR needed to calculate opening, closing and observed count.
+  const eligible=state.allotments.filter(x=>{
+    if(!x._college || !x._course) return false;
+    const status=norm(x.status||"");
+    if(/NOT ALLOTTED|NO ALLOTMENT|FRESH ALLOTTED IN/.test(status)) return false;
+    if(selectedCollege && !norm(x._college).includes(selectedCollege)) return false;
+    if(selectedCourse && !norm(x._course).includes(selectedCourse)) return false;
+    return Number(x.rank_value)>0;
+  });
+
+  const groups=new Map();
+  for(const x of eligible){
+    const key=`${x.round}|${x._college}|${x._course}`;
+    const rank=Number(x.rank_value);
+    const g=groups.get(key)||{round:x.round,college:x._college,course:x._course,count:0,opening:Infinity,closing:-Infinity};
+    g.count+=1; g.opening=Math.min(g.opening,rank); g.closing=Math.max(g.closing,rank);
+    groups.set(key,g);
+  }
+
+  const byCollegeCourse=new Map();
+  for(const g of groups.values()){
+    const key=`${g.college}|${g.course}`;
+    const row=byCollegeCourse.get(key)||{_college:g.college,_course:g.course};
+    row[`allotment_count_${g.round}`]=g.count;
+    row[`opening_rank_${g.round}`]=g.opening;
+    row[`closing_rank_${g.round}`]=g.closing;
+    byCollegeCourse.set(key,row);
+  }
+
+  const rows=[...byCollegeCourse.values()].filter(x=>
+    (!selectedCollege||norm(x._college).includes(selectedCollege)) &&
+    (!selectedCourse||norm(x._course).includes(selectedCourse))
+  );
+
   if(!rows.length){
     document.getElementById("movementResults").hidden=true;
+    document.getElementById("movementEmpty").hidden=false;
     document.getElementById("movementEmpty").textContent="No matching historical movement found. Try a broader college or course name.";
     return;
   }
-  const x=rows[0];
+
+  const x=rows.sort((a,b)=>{
+    const ac=norm(a._college), bc=norm(b._college);
+    return ac.localeCompare(bc,"en",{sensitivity:"base"});
+  })[0];
+
   document.getElementById("movementEmpty").hidden=true;
   document.getElementById("movementResults").hidden=false;
   document.getElementById("movementTitle").textContent=`${x._college||"Institute not available"} · ${x._course||"Course not available"}`;
   const rounds=[["R1","Round 1"],["R2","Round 2"],["R3","Round 3"],["STRAY","Stray"]];
   document.getElementById("movementRow").innerHTML=rounds.map(([r,label])=>{
     const o=x[`opening_rank_${r}`], c=x[`closing_rank_${r}`];
-    return `<div class="move-box"><small>${label}</small><strong>${o&&c?`${fmt(o)} – ${fmt(c)}`:"—"}</strong><span>${x[`allotment_count_${r}`]?fmt(x[`allotment_count_${r}`])+" allotments":"No observed data"}</span></div>`;
+    return `<div class="move-box"><small>${label}</small><strong>${Number.isFinite(o)&&Number.isFinite(c)?`${fmt(o)} – ${fmt(c)}`:"—"}</strong><span>${x[`allotment_count_${r}`]?fmt(x[`allotment_count_${r}`])+" allotments":"No observed data"}</span></div>`;
   }).join("");
 }
 
