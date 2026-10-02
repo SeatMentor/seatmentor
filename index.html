@@ -28,6 +28,43 @@
     </div>
   </section>
 
+  <section class="section selector-section">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Explore counselling data</p>
+        <h2>Select your counselling & round</h2>
+      </div>
+      <span class="status">More rounds can be added later without changing the page design.</span>
+    </div>
+
+    <div class="global-filters card">
+      <label>
+        <span>Counselling</span>
+        <select id="globalCounselling">
+          <option value="AIQ">All India Quota (AIQ)</option>
+          <option value="BIHAR">Bihar PGMAC</option>
+        </select>
+      </label>
+      <label>
+        <span>Year</span>
+        <select id="globalYear">
+          <option value="2025">2025</option>
+        </select>
+      </label>
+      <label>
+        <span>Round</span>
+        <select id="globalRound">
+          <option value="1">Round 1</option>
+        </select>
+      </label>
+      <button id="applySelection" type="button">Apply selection</button>
+    </div>
+
+    <div id="selectionNote" class="selection-note">
+      Select a counselling and round, then click <b>Apply selection</b>. Detailed seat/allotment tables stay hidden until you choose what you want to explore.
+    </div>
+  </section>
+
   <section class="section">
     <div class="section-head">
       <div>
@@ -53,25 +90,28 @@
       </div>
     </div>
 
-    <div class="filters card">
-      <input id="matrixInstitute" placeholder="Search institute">
-      <input id="matrixProgram" placeholder="Search specialty / program">
-      <select id="matrixQuota"><option value="">All quotas</option></select>
-      <button onclick="renderMatrix()">Search</button>
-    </div>
+    <div id="matrixExplorer" class="explorer" hidden>
+      <div class="filters card">
+        <input id="matrixInstitute" placeholder="Search institute">
+        <input id="matrixProgram" placeholder="Search specialty / program">
+        <select id="matrixQuota"><option value="">All quotas</option></select>
+        <button id="matrixSearch" type="button">Search</button>
+      </div>
 
-    <div class="table-wrap card">
-      <table>
-        <thead>
-          <tr>
-            <th>Institute</th><th>Program</th><th>Quota</th>
-            <th>Open</th><th>EWS</th><th>OBC</th><th>SC</th><th>ST</th><th>Total</th>
-          </tr>
-        </thead>
-        <tbody id="matrixBody">
-          <tr><td colspan="9" class="empty">Loading…</td></tr>
-        </tbody>
-      </table>
+      <div class="table-wrap card">
+        <table>
+          <thead>
+            <tr>
+              <th>Institute</th><th>Program</th><th>Quota</th>
+              <th>Open</th><th>EWS</th><th>OBC</th><th>SC</th><th>ST</th><th>Total</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="matrixPrompt" class="selection-note">
+      Choose a counselling and round above to reveal the seat matrix.
     </div>
   </section>
 
@@ -83,26 +123,29 @@
       </div>
     </div>
 
-    <div class="filters card">
-      <input id="allotInstitute" placeholder="Search institute">
-      <input id="allotBranch" placeholder="Search specialty / branch">
-      <select id="allotCategory"><option value="">All allotted categories</option></select>
-      <input id="allotAir" type="number" min="1" placeholder="Max AIR">
-      <button onclick="renderAllotments()">Search</button>
-    </div>
+    <div id="allotmentExplorer" class="explorer" hidden>
+      <div class="filters card">
+        <input id="allotInstitute" placeholder="Search institute">
+        <input id="allotBranch" placeholder="Search specialty / branch">
+        <select id="allotCategory"><option value="">All allotted categories</option></select>
+        <input id="allotAir" type="number" min="1" placeholder="Max AIR">
+        <button id="allotSearch" type="button">Search</button>
+      </div>
 
-    <div class="table-wrap card">
-      <table>
-        <thead>
-          <tr>
-            <th>AIR</th><th>Institute</th><th>Branch</th>
-            <th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th>
-          </tr>
-        </thead>
-        <tbody id="allotmentBody">
-          <tr><td colspan="7" class="empty">Loading…</td></tr>
-        </tbody>
-      </table>
+      <div class="table-wrap card">
+        <table>
+          <thead>
+            <tr>
+              <th>AIR</th><th>Institute</th><th>Branch</th>
+              <th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="allotmentBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="allotmentPrompt" class="selection-note">
+      Allotment records are shown only after you select a counselling and round.
     </div>
   </section>
 
