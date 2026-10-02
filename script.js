@@ -142,6 +142,41 @@ function deriveCollegeState(x){
 // some course labels contain NBEMS/diploma prefixes, and some college cells contain
 // addresses or email IDs. We create clean candidate-facing fields without changing
 // the original source columns.
+
+// Exact/near-exact course labels commonly found in Bihar PGMAC extracts.
+const EXACT_COURSE_MAP = [
+  ["GENERAL MEDICINE", "MD - General Medicine"],
+  ["GENERAL SURGERY", "MS - General Surgery"],
+  ["ANAESTHESIOLOGY", "MD - Anaesthesiology"],
+  ["PAEDIATRICS", "MD - Paediatrics"],
+  ["PEDIATRICS", "MD - Paediatrics"],
+  ["ORTHOPAEDICS", "MS - Orthopaedics"],
+  ["ORTHOPEDICS", "MS - Orthopaedics"],
+  ["RADIO DIAGNOSIS", "MD - Radio Diagnosis / Radiology"],
+  ["RADIODIAGNOSIS", "MD - Radio Diagnosis / Radiology"],
+  ["RADIOLOGY", "MD - Radio Diagnosis / Radiology"],
+  ["OBS GYNAE", "MS - Obstetrics & Gynaecology"],
+  ["OBS & GYNAE", "MS - Obstetrics & Gynaecology"],
+  ["OPHTHALMOLOGY", "MS - Ophthalmology"],
+  ["E N T", "MS - ENT"],
+  ["E N T", "MS - ENT"],
+  ["E N T", "MS - ENT"],
+  ["E N T", "MS - ENT"],
+  ["PATHOLOGY", "MD - Pathology"],
+  ["MICROBIOLOGY", "MD - Microbiology"],
+  ["PHARMACOLOGY", "MD - Pharmacology"],
+  ["PHYSIOLOGY", "MD - Physiology"],
+  ["PSYCHIATRY", "MD - Psychiatry"],
+  ["COMMUNITY MEDICINE", "MD - Community Medicine"],
+  ["F M T", "MD - Forensic Medicine"],
+  ["FORENSIC MEDICINE", "MD - Forensic Medicine"],
+  ["ANATOMY", "MD - Anatomy"],
+  ["BIOCHEMISTRY", "MD - Biochemistry"],
+  ["DERMATOLOGY", "MD - Dermatology"],
+  ["RADIO ONCOLOGY", "MD - Radiotherapy"],
+  ["PHYSICAL MEDICINE REHABILITATION", "MD - Physical Medicine & Rehabilitation"]
+];
+
 const COURSE_PATTERNS = [
   ["MD - General Medicine", /GENERAL\s+MEDICINE/],
   ["MS - General Surgery", /GENERAL\s+SURGERY/],
@@ -195,6 +230,13 @@ const COURSE_PATTERNS = [
 function canonicalCourse(...values){
   const raws=values.map(v=>String(v||"").trim()).filter(Boolean);
   if(!raws.length) return "";
+  // First check exact/near-exact labels before broader regex rules.
+  for(const raw of raws){
+    const n=norm(raw);
+    for(const [needle,label] of EXACT_COURSE_MAP){
+      if(n===needle || n.includes(needle)) return label;
+    }
+  }
   // Prefer a value that actually looks like a course over a seat/remarks string.
   const scored=raws.map(raw=>{
     const n=norm(raw);
@@ -285,7 +327,11 @@ function populateRankCourseOptions(){
   const sel=document.getElementById("rankCourse");
   if(!sel) return;
   const previous=sel.value;
-  const courses=[...new Set(currentAllotments().map(x=>x._course).filter(Boolean))]
+  // Build the candidate-facing course master from the entire selected counselling
+  // dataset, not only the currently selected round. Some Bihar Round-1 rows have
+  // shifted PDF columns; using the full counselling file prevents the dropdown
+  // from becoming empty simply because a particular round has noisier extraction.
+  const courses=[...new Set(state.allotments.map(x=>x._course).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
   sel.innerHTML=`<option value="">All courses</option>` + courses.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
   sel.value=courses.includes(previous)?previous:"";
