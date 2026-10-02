@@ -99,13 +99,35 @@ function populateRankFilters(){
   const stateSel=document.getElementById("rankState");
   const catSel=document.getElementById("rankCategory");
   const states=[...new Set(rows.map(x=>String(x.state||"").trim()).filter(Boolean))].sort();
-  const cats=[...new Set(rows.map(x=>cleanCategory(x.category)).filter(Boolean))].sort();
+
+  // Category is intentionally a controlled SeatMentor list. Do not expose
+  // raw PDF extraction values here because source files contain variants
+  // and occasional extraction noise. The selected value is mapped back to
+  // source variants through cleanCategory() when the user searches.
+  const categories=[
+    ["", "All categories"],
+    ["GENERAL", "General / UR"],
+    ["OBC", "OBC"],
+    ["SC", "SC"],
+    ["ST", "ST"],
+    ["EWS", "EWS"],
+    ["NRI", "NRI"]
+  ];
+
+  const previousState=stateSel.value;
+  const previousCategory=catSel.value;
   stateSel.innerHTML='<option value="">All states</option>'+states.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
-  catSel.innerHTML='<option value="">All categories</option>'+cats.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  catSel.innerHTML=categories.map(([value,label])=>`<option value="${value}">${label}</option>`).join("");
+
+  if(states.includes(previousState)) stateSel.value=previousState;
+  if(categories.some(([value])=>value===previousCategory)) catSel.value=previousCategory;
+
   // AIQ source currently carries "All India" rather than the college's state;
   // keep the filter honest rather than inventing a college-state mapping.
   if(state.counselling==="AIQ" && states.length===1 && states[0]==="All India"){
-    stateSel.title="AIQ source currently records counselling as All India; college-state mapping will be added in the next data-quality pass.";
+    stateSel.title="AIQ source currently records All India as the state field; physical college-state mapping will be added separately.";
+  } else {
+    stateSel.title="";
   }
 }
 
