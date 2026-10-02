@@ -135,11 +135,47 @@ function deriveCollegeState(x){
   return "";
 }
 
+// The PDF extraction can occasionally shift college text into the course column.
+// Keep only course-like labels here; preserve the exact source wording for values
+// that pass the check. This prevents entries such as K.M.C. KATIHAR or N.M.C. PATNA
+// from appearing in the Course dropdown.
+const BARE_PG_COURSES = new Set([
+  "ANAESTHESIOLOGY","ANATOMY","BIOCHEMISTRY","COMMUNITY MEDICINE","DERMATOLOGY",
+  "E N T","E.N.T.","ENT","F.M.T.","FMT","FORENSIC MEDICINE","GENERAL MEDICINE",
+  "GENERAL SURGERY","GERIATRICS","MICROBIOLOGY","MEDICINE","NUCLEAR MEDICINE",
+  "OBS & GYNAE","OBSTETRICS & GYNAECOLOGY","OBSTETRICS AND GYNAECOLOGY",
+  "OPHTHALMOLOGY","ORTHOPAEDICS","PAEDIATRICS","PATHOLOGY","PHARMACOLOGY",
+  "PHYSIOLOGY","PSYCHIATRY","RADIO ONCOLOGY","RADIODIAGNOSIS","RADIO DIAGNOSIS",
+  "RADIOLOGY","RESPIRATORY MEDICINE","PULMONARY MEDICINE","PHY.MED.& REHAB.",
+  "PHYSICAL MEDICINE & REHABILITATION","TB & CHEST","TRANSFUSION MEDICINE",
+  "TROPICAL MEDICINE","VENEREOLOGY","SOCIAL & PREVENTIVE MEDICINE / COMMUNITY MEDICINE"
+].map(x=>norm(x)));
+
+function isCourseLike(value){
+  const raw=String(value||"").trim();
+  const n=norm(raw);
+  if(!n || raw.length>90) return false;
+  if(BARE_PG_COURSES.has(n)) return true;
+
+  // Degree/diploma nomenclature used by NMC/MCC datasets.
+  const degreePrefix=/^(MD|MS|DNB|DM|MCH|DIPLOMA|PG DIPLOMA|MD MS|MD MS)\b/;
+  if(degreePrefix.test(n)) {
+    // Reject obvious extraction spillovers: college/institution text, rank/category
+    // phrases, or multiple unrelated course blocks in one cell.
+    if(/\b(COLLEGE|INSTITUTE|HOSPITAL|AGAINST|CATEGORY SEAT|JUMP OVER|COMPENSATION SEAT|NBEMS).{0,40}\b/.test(n)) return false;
+    if((n.match(/\bMD\b/g)||[]).length>1 || (n.match(/\bMS\b/g)||[]).length>1) return false;
+    return true;
+  }
+  return false;
+}
+
 function populateRankCourseOptions(){
   const sel=document.getElementById("rankCourse");
   if(!sel) return;
   const previous=sel.value;
-  const courses=[...new Set(currentAllotments().map(x=>String(x.course||"").trim()).filter(Boolean))]
+  const courses=[...new Set(currentAllotments()
+    .map(x=>String(x.course||"").trim())
+    .filter(isCourseLike))]
     .sort((a,b)=>a.localeCompare(b,"en",{sensitivity:"base"}));
   sel.innerHTML=`<option value="">All courses</option>` + courses.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
   sel.value=courses.includes(previous)?previous:"";
