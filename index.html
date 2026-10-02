@@ -3,67 +3,130 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SeatMentor — Medical Counselling</title>
-  <meta name="description" content="SeatMentor helps students explore medical counselling seats, colleges and specialties.">
+  <title>SeatMentor — Counselling Insights</title>
+  <meta name="description" content="SeatMentor turns counselling PDFs into searchable seat and allotment insights.">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">Seat<span>Mentor</span></div>
-    <nav>
-      <a href="#search">Seat Search</a>
-      <a href="#insights">Insights</a>
-      <a href="#about">About</a>
-    </nav>
-  </header>
+<header class="topbar">
+  <div class="brand">Seat<span>Mentor</span></div>
+  <nav>
+    <a href="#dashboard">Dashboard</a>
+    <a href="#seat-matrix">Seat Matrix</a>
+    <a href="#allotments">Allotments</a>
+    <a href="#about">About</a>
+  </nav>
+</header>
 
-  <main>
-    <section class="hero">
+<main id="dashboard">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">PG Counselling Analytics</p>
+      <h1>Turn counselling PDFs<br><span>into useful insights.</span></h1>
+      <p class="sub">Search seat matrices, explore allotments and understand rank trends — all in one place.</p>
+      <a class="cta" href="#seat-matrix">Explore data ↓</a>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
       <div>
-        <p class="eyebrow">NBEMS / Medical Counselling</p>
-        <h1>Find the right seat,<br><span>with clarity.</span></h1>
-        <p class="sub">Search colleges, specialties and seat availability in one simple place.</p>
-        <a class="cta" href="#search">Explore Seats →</a>
+        <p class="eyebrow">Current data loaded</p>
+        <h2>Round 1 — 2025</h2>
       </div>
-    </section>
+      <span id="status" class="status">Loading data…</span>
+    </div>
 
-    <section id="search" class="card search-card">
-      <h2>Seat Search</h2>
-      <div class="filters">
-        <input id="college" placeholder="College / Hospital">
-        <input id="specialty" placeholder="Specialty">
-        <select id="category">
-          <option value="">All categories</option>
-          <option>General</option>
-          <option>OBC</option>
-          <option>SC</option>
-          <option>ST</option>
-          <option>EWS</option>
-        </select>
-        <button onclick="searchSeats()">Search</button>
+    <div class="stats">
+      <div class="stat"><span>AIQ Seats</span><strong id="totalSeats">—</strong></div>
+      <div class="stat"><span>AIQ Institutes</span><strong id="aiqInstitutes">—</strong></div>
+      <div class="stat"><span>AIQ Programs</span><strong id="aiqPrograms">—</strong></div>
+      <div class="stat"><span>PGMAC Allotments</span><strong id="allotmentCount">—</strong></div>
+    </div>
+  </section>
+
+  <section id="seat-matrix" class="section">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">AIQ source</p>
+        <h2>Seat Matrix Explorer</h2>
       </div>
-      <div id="results" class="results">
-        <div class="empty">Seat data will appear here.</div>
+    </div>
+
+    <div class="filters card">
+      <input id="matrixInstitute" placeholder="Search institute">
+      <input id="matrixProgram" placeholder="Search specialty / program">
+      <select id="matrixQuota"><option value="">All quotas</option></select>
+      <button onclick="renderMatrix()">Search</button>
+    </div>
+
+    <div class="table-wrap card">
+      <table>
+        <thead>
+          <tr>
+            <th>Institute</th><th>Program</th><th>Quota</th>
+            <th>Open</th><th>EWS</th><th>OBC</th><th>SC</th><th>ST</th><th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="matrixBody">
+          <tr><td colspan="9" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="allotments" class="section">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Bihar PGMAC source</p>
+        <h2>Allotment Explorer</h2>
       </div>
-    </section>
+    </div>
 
-    <section id="insights" class="section">
-      <p class="eyebrow">Coming next</p>
-      <h2>Useful counselling insights</h2>
-      <div class="grid">
-        <div class="mini"><b>Seat Matrix</b><span>College-wise and specialty-wise seats</span></div>
-        <div class="mini"><b>Cut-off Trends</b><span>Previous-round closing rank insights</span></div>
-        <div class="mini"><b>College Finder</b><span>Shortlist options based on your rank</span></div>
+    <div class="filters card">
+      <input id="allotInstitute" placeholder="Search institute">
+      <input id="allotBranch" placeholder="Search specialty / branch">
+      <select id="allotCategory"><option value="">All allotted categories</option></select>
+      <input id="allotAir" type="number" min="1" placeholder="Max AIR">
+      <button onclick="renderAllotments()">Search</button>
+    </div>
+
+    <div class="table-wrap card">
+      <table>
+        <thead>
+          <tr>
+            <th>AIR</th><th>Institute</th><th>Branch</th>
+            <th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody id="allotmentBody">
+          <tr><td colspan="7" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">Derived insights</p>
+        <h2>What the data tells us</h2>
       </div>
-    </section>
+    </div>
+    <div class="insight-grid">
+      <div class="insight card"><b id="topProgram">—</b><span>Largest AIQ program by seats in the loaded matrix</span></div>
+      <div class="insight card"><b id="topInstitute">—</b><span>Institute with the largest AIQ seat count in the loaded matrix</span></div>
+      <div class="insight card"><b id="bestObserved">—</b><span>Lowest observed AIR in the loaded PGMAC allotment data</span></div>
+    </div>
+  </section>
 
-    <section id="about" class="about">
-      <h2>Built for students.</h2>
-      <p>SeatMentor is designed to make counselling information easier to understand and compare.</p>
-    </section>
-  </main>
+  <section id="about" class="about">
+    <h2>Built from source documents.</h2>
+    <p>SeatMentor is designed to turn official counselling documents into structured, searchable information. More rounds and state counselling datasets can be added without changing the core website.</p>
+  </section>
+</main>
 
-  <footer>© 2026 SeatMentor</footer>
-  <script src="script.js"></script>
+<footer>© 2026 SeatMentor</footer>
+<script src="script.js"></script>
 </body>
 </html>
