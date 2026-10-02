@@ -177,6 +177,67 @@ const EXACT_COURSE_MAP = [
   ["PHYSICAL MEDICINE REHABILITATION", "MD - Physical Medicine & Rehabilitation"]
 ];
 
+// Candidate-facing institute ownership/type classification. We only classify when
+// the institute name has a strong, recognizable signal; otherwise it stays
+// unclassified and remains visible under "All institutes".
+const GOVERNMENT_INSTITUTE_PATTERNS = [
+  /AIIMS|ALL INDIA INSTITUTE OF MEDICAL SCIENCES/,
+  /GOVT|GOVERNMENT|AUTONOMOUS STATE MEDICAL COLLEGE/,
+  /PGIMER|JIPMER|VMMC|SAFDARJUNG|RAM MANOHAR LOHIA/,
+  /I\.G\.I\.M\.S|IGIMS/,
+  /P\.M\.C\.?\s*PATNA|PATNA MEDICAL COLLEGE/,
+  /N\.M\.C\.?\s*PATNA|NALANDA MEDICAL COLLEGE/,
+  /D\.M\.C\.?\s*LAHERIASARAI|DARBHANGA MEDICAL COLLEGE/,
+  /S\.K\.M\.C\.?\s*MUZAFFARPUR|SRI KRISHNA MEDICAL COLLEGE/,
+  /J\.L\.N\.M\.C\.?\s*BHAGALPUR|JAWAHARLAL NEHRU MEDICAL COLLEGE.*BHAGALPUR/,
+  /A\.N\.M\.M\.C\.?\s*GAYA|ANUGRAH NARAYAN MAGADH MEDICAL COLLEGE/,
+  /G\.M\.C\.?\s*BETTIAH|GOVERNMENT MEDICAL COLLEGE.*BETTIAH/,
+  /RAJENDRA INSTITUTE OF MEDICAL SCIENCES|RIMS\s*,?\s*RANCHI/,
+  /MAHATMA GANDHI MEMORIAL MEDICAL COLLEGE.*JAMSHEDPUR/,
+  /GANDHI MEDICAL COLLEGE/,
+  /GAJRA RAJA MEDICAL COLLEGE/,
+  /SHYAM SHAH MEDICAL COLLEGE/,
+  /BUNDELKHAND MEDICAL COLLEGE/,
+  /GOA MEDICAL COLLEGE/,
+  /K\.A\.P\.VISWANATHAM GOVERNMENT MEDICAL COLLEGE/,
+  /S\.V\. MEDICAL COLLEGE/,
+  /AUTONOMOUS MEDICAL COLLEGE/
+];
+
+const PRIVATE_INSTITUTE_PATTERNS = [
+  /K\.M\.C\.?\s*KATIHAR|KATIHAR MEDICAL COLLEGE/,
+  /MADHUBANI MEDICAL COLLEGE/,
+  /LORD BUDHA KOSHI/,
+  /NARAYAN MEDICAL COLLEGE/,
+  /NETAJI SUBHAS MEDICAL COLLEGE/,
+  /B\.M\.I\.M\.S|B M I M S|BUDDHA INSTITUTE OF MEDICAL SCIENCES/,
+  /SHRI NARAYAN MEDICAL INSTITUTE/,
+  /CHIRAYU MEDICAL COLLEGE/,
+  /PEOPLES COLLEGE OF MEDICAL SCIENCE/,
+  /SRI AUROBINDO INSTITUTE OF MEDICAL SCIENCE/,
+  /AMALTAS INSTITUTE OF MEDICAL SCIENCES/,
+  /R D GARDI MEDICAL COLLEGE|RD GARDI MEDICAL COLLEGE/,
+  /DR\.?\s*D\.?\s*Y\.?\s*PATIL MEDICAL COLLEGE|D Y PATIL MEDICAL COLLEGE/,
+  /VINAYAKA MISSIONS MEDICAL COLLEGE/,
+  /YENEPOYA MEDICAL COLLEGE/,
+  /SBKS MEDICAL|SHRI SATHYA SAI MEDICAL COLLEGE/,
+  /BHARATI VIDYAPEETH.*MEDICAL COLLEGE/,
+  /CHEttinad.*MEDICAL|CHETTINAD HOSPITAL AND RESEARCH/,
+  /M\.M\.\s*INSTITUTE OF MEDICAL SCIENCES/,
+  /AMRITA SCHOOL OF MEDICINE|AMRITA INSTITUTE OF MEDICAL SCIENCES/,
+  /SUMITRA HOSPITAL/
+];
+
+function deriveInstituteType(x){
+  const n=norm(x._college||x.college||"");
+  if(!n) return "";
+  if(GOVERNMENT_INSTITUTE_PATTERNS.some(re=>re.test(n))) return "GOVERNMENT";
+  if(PRIVATE_INSTITUTE_PATTERNS.some(re=>re.test(n))) return "PRIVATE";
+  // Strong corporate/private indicators in extracted institute names.
+  if(/(PRIVATE|PVT|TRUST|FOUNDATION|INSTITUTE OF MEDICAL SCIENCES AND RESEARCH|MEDICAL COLLEGE.*HOSPITAL)/.test(n) && !/GOVERNMENT|GOVT/.test(n)) return "PRIVATE";
+  return "";
+}
+
 const COURSE_PATTERNS = [
   ["MD - General Medicine", /GENERAL\s+MEDICINE/],
   ["MS - General Surgery", /GENERAL\s+SURGERY/],
@@ -378,9 +439,11 @@ function populateRankStateOptions(){
 function rankFilteredAllotments(){
   const selectedState=document.getElementById("rankState").value;
   const selectedCategory=document.getElementById("rankCategory").value;
+  const selectedInstituteType=document.getElementById("rankInstituteType")?.value || "ALL";
   let rows=currentAllotments();
   if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>deriveCollegeState(x)===selectedState);
   if(selectedCategory && selectedCategory!=="ALL") rows=rows.filter(x=>(x._category||cleanCategory(x.category))===selectedCategory);
+  if(selectedInstituteType && selectedInstituteType!=="ALL") rows=rows.filter(x=>deriveInstituteType(x)===selectedInstituteType);
   return rows.filter(x=>Number(x.rank_value)>0 && x.college && x.course);
 }
 
@@ -421,8 +484,9 @@ function runRank(){
   document.getElementById("rankResults").hidden=false;
   const stateLabel=document.getElementById("rankState").selectedOptions[0]?.textContent||"All college states";
   const categoryLabel=document.getElementById("rankCategory").selectedOptions[0]?.textContent||"All categories";
+  const instituteTypeLabel=document.getElementById("rankInstituteType")?.selectedOptions[0]?.textContent||"All institutes";
   document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
-  document.getElementById("rankResultCount").textContent=`${fmt(rows.length)} historical matches · ${stateLabel} · ${categoryLabel}`;
+  document.getElementById("rankResultCount").textContent=`${fmt(rows.length)} historical matches · ${stateLabel} · ${categoryLabel} · ${instituteTypeLabel}`;
   const grid=document.getElementById("rankGrid");
   if(!rows.length){
     grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty, college, state or category filter, or choose another round.</p></div>`;
@@ -502,6 +566,7 @@ document.getElementById("round").addEventListener("change",e=>{
 });
 document.getElementById("rankState").addEventListener("change",()=>{});
 document.getElementById("rankCategory").addEventListener("change",()=>{});
+document.getElementById("rankInstituteType").addEventListener("change",()=>{});
 document.getElementById("rankSearch").addEventListener("click",runRank);
 document.getElementById("exploreSearch").addEventListener("click",runExplore);
 document.getElementById("moveSearch").addEventListener("click",runMovement);
