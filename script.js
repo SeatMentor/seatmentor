@@ -123,10 +123,9 @@ async function loadDataset(){
     // Allotment is the core source for My Rank. Cutoff/movement are optional so
     // one missing auxiliary CSV cannot break the whole GitHub Pages app.
     const a = await loadCSV(p.allotment);
-    const [cRes,mRes] = await Promise.allSettled([loadCSV(p.cutoff),loadCSV(p.movement)]);
-    const c = cRes.status === "fulfilled" ? cRes.value : [];
-    const m = mRes.status === "fulfilled" ? mRes.value : [];
-    state.allotments=normalizeDataset(a); state.cutoffs=c.map(normalizeRecord); state.movement=m.map(normalizeRecord); state.loaded=true;
+    const cRes = await Promise.allSettled([loadCSV(p.cutoff)]);
+    const c = cRes[0].status === "fulfilled" ? cRes[0].value : [];
+    state.allotments=normalizeDataset(a); state.cutoffs=c.map(normalizeRecord); state.movement=[]; state.loaded=true;
     setRoundOptions(a);
     populateRankStateOptions();
     populateRankCourseOptions();
@@ -348,6 +347,2737 @@ function canonicalCourse(...values){
 }
 
 // ---------------------------------------------------------------------------
+// Final candidate-facing college master. Autocomplete is built ONLY from these
+// vetted institute names; raw PDF cells are never displayed as college options.
+const CANONICAL_COLLEGE_MASTER = {
+  "AIQ": [
+    {
+      "name": "Seth Gordhandas Sunderdas Medical College, MUMBAI",
+      "aliases": [
+        "Seth Gordhandas Sunderdas Medical College, MUMBAI"
+      ]
+    },
+    {
+      "name": "Acharya Harihar Post Graduate Institute of Cancer, Cuttack",
+      "aliases": [
+        "Acharya Harihar Post Graduate Institute of Cancer, Cuttack"
+      ]
+    },
+    {
+      "name": "ACSR GOVERNMENT MEDICAL COLLEGE,NELLORE",
+      "aliases": [
+        "ACSR GOVERNMENT MEDICAL COLLEGE,NELLORE"
+      ]
+    },
+    {
+      "name": "Agartala Government Medical College",
+      "aliases": [
+        "Agartala Government Medical College"
+      ]
+    },
+    {
+      "name": "All India Institute of Hygiene and Public Health",
+      "aliases": [
+        "All India Institute of Hygiene and Public Health"
+      ]
+    },
+    {
+      "name": "All India Institute of Physical Medicine and Rehabilitation",
+      "aliases": [
+        "All India Institute of Physical Medicine and Rehabilitation"
+      ]
+    },
+    {
+      "name": "Andhra Medical College",
+      "aliases": [
+        "Andhra Medical College"
+      ]
+    },
+    {
+      "name": "ANUGRAH NARAYAN MAGADH MEDICAL COLLEGE",
+      "aliases": [
+        "ANUGRAH NARAYAN MAGADH MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Assam Medical College",
+      "aliases": [
+        "Assam Medical College"
+      ]
+    },
+    {
+      "name": "Atal Bihari Vajpayee Government Medical College, Vidisha",
+      "aliases": [
+        "Atal Bihari Vajpayee Government Medical College, Vidisha"
+      ]
+    },
+    {
+      "name": "Autonomous State Medical College, Firozabad",
+      "aliases": [
+        "Autonomous State Medical College, Firozabad"
+      ]
+    },
+    {
+      "name": "AUTONOMOUS STATE MEDICAL COLLEGE, AYODHYA, Uttar Pradesh",
+      "aliases": [
+        "AUTONOMOUS STATE MEDICAL COLLEGE, AYODHYA, Uttar Pradesh"
+      ]
+    },
+    {
+      "name": "Autonomous State Medical College, Shahjahanpur",
+      "aliases": [
+        "Autonomous State Medical College, Shahjahanpur"
+      ]
+    },
+    {
+      "name": "B. J. MEDICAL COLLEGE, Ahmedabad",
+      "aliases": [
+        "B. J. MEDICAL COLLEGE, Ahmedabad"
+      ]
+    },
+    {
+      "name": "B.J.Government Medical College, Pune",
+      "aliases": [
+        "B.J.Government Medical College, Pune"
+      ]
+    },
+    {
+      "name": "Baba Raghav Das Medical College",
+      "aliases": [
+        "Baba Raghav Das Medical College"
+      ]
+    },
+    {
+      "name": "Bangalore Medical College and Research Institute",
+      "aliases": [
+        "Bangalore Medical College and Research Institute"
+      ]
+    },
+    {
+      "name": "Bankura Sammilani Medical College",
+      "aliases": [
+        "Bankura Sammilani Medical College"
+      ]
+    },
+    {
+      "name": "BHOPAL MEMORIAL HOSPITAL AND RESEARCH CENTRE, BHOPAL",
+      "aliases": [
+        "BHOPAL MEMORIAL HOSPITAL AND RESEARCH CENTRE, BHOPAL"
+      ]
+    },
+    {
+      "name": "BIDAR INSTITUTE OF MEDICAL SCIENCES, BIDAR",
+      "aliases": [
+        "BIDAR INSTITUTE OF MEDICAL SCIENCES, BIDAR"
+      ]
+    },
+    {
+      "name": "BPS Govt. Medical College for Women, Khanpur Kalan Sonepat",
+      "aliases": [
+        "BPS Govt. Medical College for Women, Khanpur Kalan Sonepat"
+      ]
+    },
+    {
+      "name": "Burdwan Medical College, West Bengal",
+      "aliases": [
+        "Burdwan Medical College, West Bengal"
+      ]
+    },
+    {
+      "name": "CALCUTTA NATIONAL MEDICAL COLLEGE",
+      "aliases": [
+        "CALCUTTA NATIONAL MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Calcutta School Of Tropical Medicine",
+      "aliases": [
+        "Calcutta School Of Tropical Medicine"
+      ]
+    },
+    {
+      "name": "Central Institute of Psychiatry, Ranchi",
+      "aliases": [
+        "Central Institute of Psychiatry, Ranchi"
+      ]
+    },
+    {
+      "name": "Chacha Nehru Bal Chikitsalaya",
+      "aliases": [
+        "Chacha Nehru Bal Chikitsalaya"
+      ]
+    },
+    {
+      "name": "Chamarajanagar Institute of Medical Sciences, Karnataka",
+      "aliases": [
+        "Chamarajanagar Institute of Medical Sciences, Karnataka"
+      ]
+    },
+    {
+      "name": "CHENGALPATTU MEDICAL COLLEGE, CHENGALPATTU",
+      "aliases": [
+        "CHENGALPATTU MEDICAL COLLEGE, CHENGALPATTU"
+      ]
+    },
+    {
+      "name": "CHHATTISGARH INSTITUTE OF MEDICAL SCIENCES",
+      "aliases": [
+        "CHHATTISGARH INSTITUTE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "Chittaranjan National Cancer Institute, 37-",
+      "aliases": [
+        "Chittaranjan National Cancer Institute, 37-"
+      ]
+    },
+    {
+      "name": "Chittaranjan Seva Sadan Hospital",
+      "aliases": [
+        "Chittaranjan Seva Sadan Hospital"
+      ]
+    },
+    {
+      "name": "COIMBATORE MEDICAL COLLEGE",
+      "aliases": [
+        "COIMBATORE MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "College of Medicine & Sagore Dutta Hospital",
+      "aliases": [
+        "College of Medicine & Sagore Dutta Hospital"
+      ]
+    },
+    {
+      "name": "College of Medicine and JNM Hospital, WBUHS",
+      "aliases": [
+        "College of Medicine and JNM Hospital, WBUHS"
+      ]
+    },
+    {
+      "name": "DARBHANGA MEDICAL COLLEGE",
+      "aliases": [
+        "DARBHANGA MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Dharwad Institute of Mental Health and Neurosciences (DIMHANS)",
+      "aliases": [
+        "Dharwad Institute of Mental Health and Neurosciences (DIMHANS)"
+      ]
+    },
+    {
+      "name": "Dr Ram Manohar Lohia Institute of Medical Sciences, Lucknow",
+      "aliases": [
+        "Dr Ram Manohar Lohia Institute of Medical Sciences, Lucknow"
+      ]
+    },
+    {
+      "name": "Dr. B. C. Roy Post Graduate Institute of Paediatric Sciences",
+      "aliases": [
+        "Dr. B. C. Roy Post Graduate Institute of Paediatric Sciences"
+      ]
+    },
+    {
+      "name": "Dr. Rajendra Prasad Government Medical College, Tanda",
+      "aliases": [
+        "Dr. Rajendra Prasad Government Medical College, Tanda"
+      ]
+    },
+    {
+      "name": "Dr. Sampurnanand Medical College (SNMC), JODHPUR",
+      "aliases": [
+        "Dr. Sampurnanand Medical College (SNMC), JODHPUR"
+      ]
+    },
+    {
+      "name": "DR. SHANKARRAO CHAVAN GOVERNMENT MEDICAL COLLEGE, NANDED",
+      "aliases": [
+        "DR. SHANKARRAO CHAVAN GOVERNMENT MEDICAL COLLEGE, NANDED"
+      ]
+    },
+    {
+      "name": "Dr. Yashwant Singh Parmar Government Medical College Nahan",
+      "aliases": [
+        "Dr. Yashwant Singh Parmar Government Medical College Nahan"
+      ]
+    },
+    {
+      "name": "Dr.B.Borooah Cancer Institute",
+      "aliases": [
+        "Dr.B.Borooah Cancer Institute"
+      ]
+    },
+    {
+      "name": "Dr.V.M.Govt.Medical College,Solapur, Maharasthtra",
+      "aliases": [
+        "Dr.V.M.Govt.Medical College,Solapur, Maharasthtra"
+      ]
+    },
+    {
+      "name": "EMPLOYEES STATE INSURANCE CORPORATION MEDICAL COLLEGE AND PGIMSR",
+      "aliases": [
+        "EMPLOYEES STATE INSURANCE CORPORATION MEDICAL COLLEGE AND PGIMSR"
+      ]
+    },
+    {
+      "name": "Employees' State Insurance Corporation Medical College & Hospital, Gulbarga",
+      "aliases": [
+        "Employees' State Insurance Corporation Medical College & Hospital, Gulbarga"
+      ]
+    },
+    {
+      "name": "ESI-POST GRADUATE INSTITUTE OF MEDICAL SCIENCES AND RESEARCH, BASAIDARAPUR, NEW DELHI",
+      "aliases": [
+        "ESI-POST GRADUATE INSTITUTE OF MEDICAL SCIENCES AND RESEARCH, BASAIDARAPUR, NEW DELHI"
+      ]
+    },
+    {
+      "name": "ESIC Medical College & Hospital, Faridabad",
+      "aliases": [
+        "ESIC Medical College & Hospital, Faridabad"
+      ]
+    },
+    {
+      "name": "ESIC Medical College and PGIMSR",
+      "aliases": [
+        "ESIC Medical College and PGIMSR"
+      ]
+    },
+    {
+      "name": "ESIC Medical College, Hyderbad",
+      "aliases": [
+        "ESIC Medical College, Hyderbad"
+      ]
+    },
+    {
+      "name": "ESIC MEDICAL COLLEGE, JOKA",
+      "aliases": [
+        "ESIC MEDICAL COLLEGE, JOKA"
+      ]
+    },
+    {
+      "name": "Fakhruddin Ali Ahmed Medical College",
+      "aliases": [
+        "Fakhruddin Ali Ahmed Medical College"
+      ]
+    },
+    {
+      "name": "GADAG INSTITUTE OF MEDICAL SCIENCES GADAG",
+      "aliases": [
+        "GADAG INSTITUTE OF MEDICAL SCIENCES GADAG"
+      ]
+    },
+    {
+      "name": "GAJRA RAJA MEDICAL COLLEGE GWALIOR",
+      "aliases": [
+        "GAJRA RAJA MEDICAL COLLEGE GWALIOR"
+      ]
+    },
+    {
+      "name": "GANDHI MEDICAL COLLEGE",
+      "aliases": [
+        "GANDHI MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Gandhi Medical College, Bhopal",
+      "aliases": [
+        "Gandhi Medical College, Bhopal"
+      ]
+    },
+    {
+      "name": "Ganesh Shankar Vidyarthi Memorial Medical College",
+      "aliases": [
+        "Ganesh Shankar Vidyarthi Memorial Medical College"
+      ]
+    },
+    {
+      "name": "Gauhati Medical College, Guwahati",
+      "aliases": [
+        "Gauhati Medical College, Guwahati"
+      ]
+    },
+    {
+      "name": "GMC Bharat Ratna Late Shri Atal Bihari Vajpayee Memorial Medical College, Chhattisgarh",
+      "aliases": [
+        "GMC Bharat Ratna Late Shri Atal Bihari Vajpayee Memorial Medical College, Chhattisgarh"
+      ]
+    },
+    {
+      "name": "GOA MEDICAL COLLEGE",
+      "aliases": [
+        "GOA MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "GOVERNMENT DHARMAPURI MEDICAL COLLEGE, DHARMAPURI, TAMIL NADU",
+      "aliases": [
+        "GOVERNMENT DHARMAPURI MEDICAL COLLEGE, DHARMAPURI, TAMIL NADU"
+      ]
+    },
+    {
+      "name": "Government Erode Medical College- Formerly IRT- Perundurai Medical College",
+      "aliases": [
+        "Government Erode Medical College- Formerly IRT- Perundurai Medical College"
+      ]
+    },
+    {
+      "name": "Government Institute of Medical Sciences, Greater Noida, Uttar Pradesh",
+      "aliases": [
+        "Government Institute of Medical Sciences, Greater Noida, Uttar Pradesh"
+      ]
+    },
+    {
+      "name": "Government Kilpauk Medical College",
+      "aliases": [
+        "Government Kilpauk Medical College"
+      ]
+    },
+    {
+      "name": "Government Medical College & Hospital, Budaun, Uttar Pradesh",
+      "aliases": [
+        "Government Medical College & Hospital, Budaun, Uttar Pradesh"
+      ]
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE - KANNUR",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE - KANNUR"
+      ]
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE AND ESIC HOSPITAL, COIMBATORE",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE AND ESIC HOSPITAL, COIMBATORE"
+      ]
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE CHANDRAPUR, MAHARASHTRA",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE CHANDRAPUR, MAHARASHTRA"
+      ]
+    },
+    {
+      "name": "Government Medical College Hospital, Manjeri",
+      "aliases": [
+        "Government Medical College Hospital, Manjeri"
+      ]
+    },
+    {
+      "name": "Government Medical College Hospital, Omandurar",
+      "aliases": [
+        "Government Medical College Hospital, Omandurar"
+      ]
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE KADAPA (FORMERLY RAJIV GANDHI INSTITUTE OF MEDICAL SCIENCES, KADAPA)",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE KADAPA (FORMERLY RAJIV GANDHI INSTITUTE OF MEDICAL SCIENCES, KADAPA)"
+      ]
+    },
+    {
+      "name": "Government Medical College Kannauj , Uttar Pradesh",
+      "aliases": [
+        "Government Medical College Kannauj , Uttar Pradesh"
+      ]
+    },
+    {
+      "name": "Government Medical College Kota",
+      "aliases": [
+        "Government Medical College Kota"
+      ]
+    },
+    {
+      "name": "Government Medical College Kozhikode",
+      "aliases": [
+        "Government Medical College Kozhikode"
+      ]
+    },
+    {
+      "name": "Government medical college patiala.",
+      "aliases": [
+        "Government medical college patiala."
+      ]
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE SHAHDOL",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE SHAHDOL"
+      ]
+    },
+    {
+      "name": "Government Medical College Srinagar",
+      "aliases": [
+        "Government Medical College Srinagar"
+      ]
+    },
+    {
+      "name": "Government Medical College Suryapet Telangana",
+      "aliases": [
+        "Government Medical College Suryapet Telangana"
+      ]
+    },
+    {
+      "name": "Government Medical College, Aurangabad",
+      "aliases": [
+        "Government Medical College, Aurangabad"
+      ]
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, AZAMGARH",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, AZAMGARH"
+      ]
+    },
+    {
+      "name": "Government Medical College, Baramati",
+      "aliases": [
+        "Government Medical College, Baramati"
+      ]
+    },
+    {
+      "name": "Government Medical College, Cuddalore District",
+      "aliases": [
+        "Government Medical College, Cuddalore District"
+      ]
+    },
+    {
+      "name": "Government Medical College, Datia",
+      "aliases": [
+        "Government Medical College, Datia"
+      ]
+    },
+    {
+      "name": "Government Medical College, Dungarpur",
+      "aliases": [
+        "Government Medical College, Dungarpur"
+      ]
+    },
+    {
+      "name": "Government Medical College, Gondia",
+      "aliases": [
+        "Government Medical College, Gondia"
+      ]
+    },
+    {
+      "name": "Government Medical College, Jalgaon",
+      "aliases": [
+        "Government Medical College, Jalgaon"
+      ]
+    },
+    {
+      "name": "Government Medical College, Kollam",
+      "aliases": [
+        "Government Medical College, Kollam"
+      ]
+    },
+    {
+      "name": "Government Medical College, Latur",
+      "aliases": [
+        "Government Medical College, Latur"
+      ]
+    },
+    {
+      "name": "Government Medical College, Miraj",
+      "aliases": [
+        "Government Medical College, Miraj"
+      ]
+    },
+    {
+      "name": "Government Medical College, Nagpur",
+      "aliases": [
+        "Government Medical College, Nagpur"
+      ]
+    },
+    {
+      "name": "Government Medical College, Nalgonda",
+      "aliases": [
+        "Government Medical College, Nalgonda"
+      ]
+    },
+    {
+      "name": "Government Medical College, Nizamabad, Telangana State",
+      "aliases": [
+        "Government Medical College, Nizamabad, Telangana State"
+      ]
+    },
+    {
+      "name": "Government Medical College, Pali Rajasthan.",
+      "aliases": [
+        "Government Medical College, Pali Rajasthan."
+      ]
+    },
+    {
+      "name": "Government Medical College, Ratlam",
+      "aliases": [
+        "Government Medical College, Ratlam"
+      ]
+    },
+    {
+      "name": "Government Medical College, Siddipet",
+      "aliases": [
+        "Government Medical College, Siddipet"
+      ]
+    },
+    {
+      "name": "Government Medical College, Surat",
+      "aliases": [
+        "Government Medical College, Surat"
+      ]
+    },
+    {
+      "name": "Government Medical College,Churu",
+      "aliases": [
+        "Government Medical College,Churu"
+      ]
+    },
+    {
+      "name": "Government Medical College,Theni",
+      "aliases": [
+        "Government Medical College,Theni"
+      ]
+    },
+    {
+      "name": "Government Mohan Kumaramangalam Medical College, Salem",
+      "aliases": [
+        "Government Mohan Kumaramangalam Medical College, Salem"
+      ]
+    },
+    {
+      "name": "Government Sivagangai Medical College and Hospital, Tamil Nadu",
+      "aliases": [
+        "Government Sivagangai Medical College and Hospital, Tamil Nadu"
+      ]
+    },
+    {
+      "name": "Government T D Medical College, Vandanm , Alappuzha",
+      "aliases": [
+        "Government T D Medical College, Vandanm , Alappuzha"
+      ]
+    },
+    {
+      "name": "Government Thiruvannamalai Medical College, Thiruvannamalai, Tamil Nadu",
+      "aliases": [
+        "Government Thiruvannamalai Medical College, Thiruvannamalai, Tamil Nadu"
+      ]
+    },
+    {
+      "name": "GOVERNMENT THOOTHUKUDI MEDICAL COLLEGE, THOOTHUKUDI",
+      "aliases": [
+        "GOVERNMENT THOOTHUKUDI MEDICAL COLLEGE, THOOTHUKUDI"
+      ]
+    },
+    {
+      "name": "GOVERNMENT VELLORE MEDICAL COLLEGE",
+      "aliases": [
+        "GOVERNMENT VELLORE MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "GOVERNMENT VILLUPURAM MEDICAL COLLEGE, VILLUPURAM",
+      "aliases": [
+        "GOVERNMENT VILLUPURAM MEDICAL COLLEGE, VILLUPURAM"
+      ]
+    },
+    {
+      "name": "GOVT MEDICAL COLLEGE KOTTAYAM",
+      "aliases": [
+        "GOVT MEDICAL COLLEGE KOTTAYAM"
+      ]
+    },
+    {
+      "name": "Govt Medical college Shivpuri",
+      "aliases": [
+        "Govt Medical college Shivpuri"
+      ]
+    },
+    {
+      "name": "GOVT MEDICAL COLLEGE, ANANTAPURAMU",
+      "aliases": [
+        "GOVT MEDICAL COLLEGE, ANANTAPURAMU"
+      ]
+    },
+    {
+      "name": "GOVT MEDICAL COLLEGE, ERNAKULAM",
+      "aliases": [
+        "GOVT MEDICAL COLLEGE, ERNAKULAM"
+      ]
+    },
+    {
+      "name": "GOVT MEDICAL COLLEGE,THRISSUR",
+      "aliases": [
+        "GOVT MEDICAL COLLEGE,THRISSUR"
+      ]
+    },
+    {
+      "name": "Govt. Bundelkhand Medical College Sagar M.P.",
+      "aliases": [
+        "Govt. Bundelkhand Medical College Sagar M.P."
+      ]
+    },
+    {
+      "name": "Govt. Doon Medical College, Dehradun",
+      "aliases": [
+        "Govt. Doon Medical College, Dehradun"
+      ]
+    },
+    {
+      "name": "Govt. Medical College Akola",
+      "aliases": [
+        "Govt. Medical College Akola"
+      ]
+    },
+    {
+      "name": "GOVT. MEDICAL COLLEGE AND HOSPITAL, CHANDIGARH",
+      "aliases": [
+        "GOVT. MEDICAL COLLEGE AND HOSPITAL, CHANDIGARH"
+      ]
+    },
+    {
+      "name": "GOVT. MEDICAL COLLEGE, AMRITSAR",
+      "aliases": [
+        "GOVT. MEDICAL COLLEGE, AMRITSAR"
+      ]
+    },
+    {
+      "name": "Govt. Medical College, Baroda",
+      "aliases": [
+        "Govt. Medical College, Baroda"
+      ]
+    },
+    {
+      "name": "Govt. Medical College, Bhavnagar",
+      "aliases": [
+        "Govt. Medical College, Bhavnagar"
+      ]
+    },
+    {
+      "name": "Govt. Medical College, Jammu",
+      "aliases": [
+        "Govt. Medical College, Jammu"
+      ]
+    },
+    {
+      "name": "GOVT. MEDICAL COLLEGE, THIRUVANANTHAPURAM",
+      "aliases": [
+        "GOVT. MEDICAL COLLEGE, THIRUVANANTHAPURAM"
+      ]
+    },
+    {
+      "name": "Grant Medical College, Maharashtra",
+      "aliases": [
+        "Grant Medical College, Maharashtra"
+      ]
+    },
+    {
+      "name": "Gulbarga Institute Of Medical Sciences, Kalaburagi",
+      "aliases": [
+        "Gulbarga Institute Of Medical Sciences, Kalaburagi"
+      ]
+    },
+    {
+      "name": "GUNTUR MEDICAL COLLEGE",
+      "aliases": [
+        "GUNTUR MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Guru Gobind Singh Medical College",
+      "aliases": [
+        "Guru Gobind Singh Medical College"
+      ]
+    },
+    {
+      "name": "Gvernment Medical College,Haldwani",
+      "aliases": [
+        "Gvernment Medical College,Haldwani"
+      ]
+    },
+    {
+      "name": "Gwalior Mansik Arogyashala, Madhya Pradesh",
+      "aliases": [
+        "Gwalior Mansik Arogyashala, Madhya Pradesh"
+      ]
+    },
+    {
+      "name": "HASSAN INSTITUTE OF MEDICAL SCIENCES, HASSAN",
+      "aliases": [
+        "HASSAN INSTITUTE OF MEDICAL SCIENCES, HASSAN"
+      ]
+    },
+    {
+      "name": "HINDU RAO HOSPITAL DELHI",
+      "aliases": [
+        "HINDU RAO HOSPITAL DELHI"
+      ]
+    },
+    {
+      "name": "Hinduhridayasamrat Balasaheb Thackeray Medical College and Dr. R. N. Cooper Municipal General Hospital, Maharashtra",
+      "aliases": [
+        "Hinduhridayasamrat Balasaheb Thackeray Medical College and Dr. R. N. Cooper Municipal General Hospital, Maharashtra"
+      ]
+    },
+    {
+      "name": "HOMI BHABHA CANCER HOSPITAL, SANGRUR",
+      "aliases": [
+        "HOMI BHABHA CANCER HOSPITAL, SANGRUR"
+      ]
+    },
+    {
+      "name": "Homi Bhabha Cancer Hospital, Varanasi",
+      "aliases": [
+        "Homi Bhabha Cancer Hospital, Varanasi"
+      ]
+    },
+    {
+      "name": "INDIRA GANDHI GOVT.MEDICAL COLLEGE NAGPUR",
+      "aliases": [
+        "INDIRA GANDHI GOVT.MEDICAL COLLEGE NAGPUR"
+      ]
+    },
+    {
+      "name": "INDIRA GANDHI INSTITUTE OF CHILD HEALTH, BANGALORE",
+      "aliases": [
+        "INDIRA GANDHI INSTITUTE OF CHILD HEALTH, BANGALORE"
+      ]
+    },
+    {
+      "name": "Indira Gandhi Institute of Medical Sciences, Patna",
+      "aliases": [
+        "Indira Gandhi Institute of Medical Sciences, Patna"
+      ]
+    },
+    {
+      "name": "INDIRA GANDHI MEDICAL COLLEGE AND RESEARCH INSTITUTE, PUDUCHERRY",
+      "aliases": [
+        "INDIRA GANDHI MEDICAL COLLEGE AND RESEARCH INSTITUTE, PUDUCHERRY"
+      ]
+    },
+    {
+      "name": "Indira Gandhi Medical College Shimla",
+      "aliases": [
+        "Indira Gandhi Medical College Shimla"
+      ]
+    },
+    {
+      "name": "Institute of Child Health, Kolkata",
+      "aliases": [
+        "Institute of Child Health, Kolkata"
+      ]
+    },
+    {
+      "name": "Institute of integrated Medical Sciences (Govt.Medical College), Palakkad",
+      "aliases": [
+        "Institute of integrated Medical Sciences (Govt.Medical College), Palakkad"
+      ]
+    },
+    {
+      "name": "INSTITUTE OF MEDICAL SCIENCES, BANARAS HINDU UNIVERSITY",
+      "aliases": [
+        "INSTITUTE OF MEDICAL SCIENCES, BANARAS HINDU UNIVERSITY"
+      ]
+    },
+    {
+      "name": "INSTITUTE OF MENTAL HEALTH AND HOSPITAL, AGRA",
+      "aliases": [
+        "INSTITUTE OF MENTAL HEALTH AND HOSPITAL, AGRA"
+      ]
+    },
+    {
+      "name": "Institute of Nuclear Medicine & Allied Sciences",
+      "aliases": [
+        "Institute of Nuclear Medicine & Allied Sciences"
+      ]
+    },
+    {
+      "name": "IPGME&R and SSKM Hospital Kolkata",
+      "aliases": [
+        "IPGME&R and SSKM Hospital Kolkata"
+      ]
+    },
+    {
+      "name": "JAWAHAR LAL NEHRU MEDICAL COLLEGE, AJMER",
+      "aliases": [
+        "JAWAHAR LAL NEHRU MEDICAL COLLEGE, AJMER"
+      ]
+    },
+    {
+      "name": "JAWAHARLAL NEHRU MEDICAL COLLEGE, ALIGARH MUSLIM UNIVERSITY STATE UTTAR",
+      "aliases": [
+        "JAWAHARLAL NEHRU MEDICAL COLLEGE, ALIGARH MUSLIM UNIVERSITY STATE UTTAR"
+      ]
+    },
+    {
+      "name": "JAWAHARLAL NEHRU MEDICAL COLLEGE, BHAGALPUR",
+      "aliases": [
+        "JAWAHARLAL NEHRU MEDICAL COLLEGE, BHAGALPUR"
+      ]
+    },
+    {
+      "name": "JHALAWAR MEDICAL COLLEGE",
+      "aliases": [
+        "JHALAWAR MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Jorhat Medical College & Hospital",
+      "aliases": [
+        "Jorhat Medical College & Hospital"
+      ]
+    },
+    {
+      "name": "K.A.P.Viswanatham Government Medical College, Tiruchirapalli",
+      "aliases": [
+        "K.A.P.Viswanatham Government Medical College, Tiruchirapalli"
+      ]
+    },
+    {
+      "name": "Kakatiya Medical College",
+      "aliases": [
+        "Kakatiya Medical College"
+      ]
+    },
+    {
+      "name": "Kalpana Chawla Govt Medical College, Karnal, Haryana",
+      "aliases": [
+        "Kalpana Chawla Govt Medical College, Karnal, Haryana"
+      ]
+    },
+    {
+      "name": "KANYAKUMARI GOVERNMENT MEDICAL COLLEGE",
+      "aliases": [
+        "KANYAKUMARI GOVERNMENT MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Karnataka Medical College and Research Institute, Hubballi",
+      "aliases": [
+        "Karnataka Medical College and Research Institute, Hubballi"
+      ]
+    },
+    {
+      "name": "Karwar Institute of Medical Sciences, Karnataka",
+      "aliases": [
+        "Karwar Institute of Medical Sciences, Karnataka"
+      ]
+    },
+    {
+      "name": "Kidwai Memorial Institute of Oncolgy",
+      "aliases": [
+        "Kidwai Memorial Institute of Oncolgy"
+      ]
+    },
+    {
+      "name": "KING GEORGES MEDICAL UNIVERSITY",
+      "aliases": [
+        "KING GEORGES MEDICAL UNIVERSITY"
+      ]
+    },
+    {
+      "name": "Kodagu Institute of Medical Sciences, Karnataka",
+      "aliases": [
+        "Kodagu Institute of Medical Sciences, Karnataka"
+      ]
+    },
+    {
+      "name": "Koppal Institute of Medical Sciences Koppal, Karnataka",
+      "aliases": [
+        "Koppal Institute of Medical Sciences Koppal, Karnataka"
+      ]
+    },
+    {
+      "name": "KURNOOL MEDICAL COLLEGE",
+      "aliases": [
+        "KURNOOL MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Lady Hardinge Medical College",
+      "aliases": [
+        "Lady Hardinge Medical College"
+      ]
+    },
+    {
+      "name": "Lala Lajpat Rai Memorial Medical College, MEERUT",
+      "aliases": [
+        "Lala Lajpat Rai Memorial Medical College, MEERUT"
+      ]
+    },
+    {
+      "name": "Late Baliram Kashyap Memorial Govt Medical Dimrapal",
+      "aliases": [
+        "Late Baliram Kashyap Memorial Govt Medical Dimrapal"
+      ]
+    },
+    {
+      "name": "LATE SHRI LAKHI RAM AGRAWAL MEMORIAL GOVT.MEDICAL COLLEGE",
+      "aliases": [
+        "LATE SHRI LAKHI RAM AGRAWAL MEMORIAL GOVT.MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "LOKMANYA TILAK MEDICAL COLLEGE MUMBAI",
+      "aliases": [
+        "LOKMANYA TILAK MEDICAL COLLEGE MUMBAI"
+      ]
+    },
+    {
+      "name": "Lokopriya Gopinath Bordoloi Regional Institute of Mental Health",
+      "aliases": [
+        "Lokopriya Gopinath Bordoloi Regional Institute of Mental Health"
+      ]
+    },
+    {
+      "name": "M. P. SHAH GOVERNMENT MEDICAL COLLEGE",
+      "aliases": [
+        "M. P. SHAH GOVERNMENT MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "MADRAS MEDICAL COLLEGE",
+      "aliases": [
+        "MADRAS MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "MADURAI MEDICAL COLLEGE",
+      "aliases": [
+        "MADURAI MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "MahaMaya Rajkiya Allopathic Medical College",
+      "aliases": [
+        "MahaMaya Rajkiya Allopathic Medical College"
+      ]
+    },
+    {
+      "name": "Maharaja Krushna Chandra Gajapati Medical College , Brahmapur",
+      "aliases": [
+        "Maharaja Krushna Chandra Gajapati Medical College , Brahmapur"
+      ]
+    },
+    {
+      "name": "Maharaja Suhel Dev Autonomous State Medical College & Mahrishi Balark Hospitals, Bahraich, Uttar Pradesh",
+      "aliases": [
+        "Maharaja Suhel Dev Autonomous State Medical College & Mahrishi Balark Hospitals, Bahraich, Uttar Pradesh"
+      ]
+    },
+    {
+      "name": "MAHARANI LAXMI BAI MEDICAL COLLEGE JHANSI",
+      "aliases": [
+        "MAHARANI LAXMI BAI MEDICAL COLLEGE JHANSI"
+      ]
+    },
+    {
+      "name": "Maharashtra Post Graduate Institute of Medical Education and Research, Nashik",
+      "aliases": [
+        "Maharashtra Post Graduate Institute of Medical Education and Research, Nashik"
+      ]
+    },
+    {
+      "name": "Maharshi Devraha Baba Autonomous State Medical College, Deoria, Uttar Pradesh",
+      "aliases": [
+        "Maharshi Devraha Baba Autonomous State Medical College, Deoria, Uttar Pradesh"
+      ]
+    },
+    {
+      "name": "MAHARSHI VASISHTHA AUTONOMOUS STATE MEDICAL COLLEGE BASTI",
+      "aliases": [
+        "MAHARSHI VASISHTHA AUTONOMOUS STATE MEDICAL COLLEGE BASTI"
+      ]
+    },
+    {
+      "name": "Mahatma Gandhi Institute of Medical Sciences, Wardha",
+      "aliases": [
+        "Mahatma Gandhi Institute of Medical Sciences, Wardha"
+      ]
+    },
+    {
+      "name": "Mahatma Gandhi Memorial Medical College, Indore",
+      "aliases": [
+        "Mahatma Gandhi Memorial Medical College, Indore"
+      ]
+    },
+    {
+      "name": "Mahatma Gandhi Memorial Medical College, Jamshedpur",
+      "aliases": [
+        "Mahatma Gandhi Memorial Medical College, Jamshedpur"
+      ]
+    },
+    {
+      "name": "MALDA MEDICAL COLLEGE",
+      "aliases": [
+        "MALDA MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "MANDYA INSTITUTE OF MEDICAL SCIENCES",
+      "aliases": [
+        "MANDYA INSTITUTE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "Maulana Azad Medical College",
+      "aliases": [
+        "Maulana Azad Medical College"
+      ]
+    },
+    {
+      "name": "MEDICAL COLLEGE, KOLKATA",
+      "aliases": [
+        "MEDICAL COLLEGE, KOLKATA"
+      ]
+    },
+    {
+      "name": "Midnapore Medical College and Hospital",
+      "aliases": [
+        "Midnapore Medical College and Hospital"
+      ]
+    },
+    {
+      "name": "Moti Lal Nehru Medical College",
+      "aliases": [
+        "Moti Lal Nehru Medical College"
+      ]
+    },
+    {
+      "name": "Murshidabad Medical College and Hospital",
+      "aliases": [
+        "Murshidabad Medical College and Hospital"
+      ]
+    },
+    {
+      "name": "MYSORE MEDICAL COLLEGE AND RESEARCH INSTITUTE",
+      "aliases": [
+        "MYSORE MEDICAL COLLEGE AND RESEARCH INSTITUTE"
+      ]
+    },
+    {
+      "name": "NALANDA MEDICAL COLLEGE,PATNA",
+      "aliases": [
+        "NALANDA MEDICAL COLLEGE,PATNA"
+      ]
+    },
+    {
+      "name": "NAMO Medical Education and Research Institute, Dadra & Nagar Haveli & Daman & Diu",
+      "aliases": [
+        "NAMO Medical Education and Research Institute, Dadra & Nagar Haveli & Daman & Diu"
+      ]
+    },
+    {
+      "name": "NETAJI SUBHAS NATIONAL INSTITUTE OF SPORTS, PATIALA",
+      "aliases": [
+        "NETAJI SUBHAS NATIONAL INSTITUTE OF SPORTS, PATIALA"
+      ]
+    },
+    {
+      "name": "NETAJI SUBHASH CHANDRA BOSE MEDICAL COLLEGE, JABALPUR",
+      "aliases": [
+        "NETAJI SUBHASH CHANDRA BOSE MEDICAL COLLEGE, JABALPUR"
+      ]
+    },
+    {
+      "name": "NIL RATAN SIRCAR MEDICAL COLLEGE",
+      "aliases": [
+        "NIL RATAN SIRCAR MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "NIZAMS INSTITUTE OF MEDICAL SCIENCES",
+      "aliases": [
+        "NIZAMS INSTITUTE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "North Eastern Indira Gandhi Regional Institute of Health & Medical Sciences, Shillong",
+      "aliases": [
+        "North Eastern Indira Gandhi Regional Institute of Health & Medical Sciences, Shillong"
+      ]
+    },
+    {
+      "name": "NSC Government Medical College, Khandwa (MP)",
+      "aliases": [
+        "NSC Government Medical College, Khandwa (MP)"
+      ]
+    },
+    {
+      "name": "Osmania Medical Collge",
+      "aliases": [
+        "Osmania Medical Collge"
+      ]
+    },
+    {
+      "name": "Pandit Bhagwat Dayal Sharma Post Graduate Institute of Medical Sciences, Rohtak",
+      "aliases": [
+        "Pandit Bhagwat Dayal Sharma Post Graduate Institute of Medical Sciences, Rohtak"
+      ]
+    },
+    {
+      "name": "Pandit Dindayal Upadhyay Medical College, RAJKOT",
+      "aliases": [
+        "Pandit Dindayal Upadhyay Medical College, RAJKOT"
+      ]
+    },
+    {
+      "name": "PATNA MEDICAL COLLEGE, PATNA",
+      "aliases": [
+        "PATNA MEDICAL COLLEGE, PATNA"
+      ]
+    },
+    {
+      "name": "PGIMER, DR. RML Hospital, Cannaught Place, New Delhi",
+      "aliases": [
+        "PGIMER, DR. RML Hospital, Cannaught Place, New Delhi"
+      ]
+    },
+    {
+      "name": "Pimpri Chichwad Municipal Corporation Postgraduate Institute Y.C.M.Hospital Pimpri,Pune 18",
+      "aliases": [
+        "Pimpri Chichwad Municipal Corporation Postgraduate Institute Y.C.M.Hospital Pimpri,Pune 18"
+      ]
+    },
+    {
+      "name": "Post Graduate Institute of Child Health, Noida.",
+      "aliases": [
+        "Post Graduate Institute of Child Health, Noida."
+      ]
+    },
+    {
+      "name": "Post Graduate Institute of Medical Education & Research and Capital Hospital ( PGIMER & CH), Odisha",
+      "aliases": [
+        "Post Graduate Institute of Medical Education & Research and Capital Hospital ( PGIMER & CH), Odisha"
+      ]
+    },
+    {
+      "name": "Post Graduate Institute of Medical Sciences (PGIMS),Navi Mumbai",
+      "aliases": [
+        "Post Graduate Institute of Medical Sciences (PGIMS),Navi Mumbai"
+      ]
+    },
+    {
+      "name": "Pt. Jawahar Lal Nehru Memorial Medical College, RAIPUR",
+      "aliases": [
+        "Pt. Jawahar Lal Nehru Memorial Medical College, RAIPUR"
+      ]
+    },
+    {
+      "name": "R G KAR MEDICAL COLLEGE, West Bengal",
+      "aliases": [
+        "R G KAR MEDICAL COLLEGE, West Bengal"
+      ]
+    },
+    {
+      "name": "Radiation Medicine Centre (RMC), Bhabha Atomic Research Centre (BARC)",
+      "aliases": [
+        "Radiation Medicine Centre (RMC), Bhabha Atomic Research Centre (BARC)"
+      ]
+    },
+    {
+      "name": "RAICHUR INSTITUTE OF MEDICAL SCIENCES",
+      "aliases": [
+        "RAICHUR INSTITUTE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "Rajarshee Chhatrapati Shahu Maharaj Government Medical College, Kolhapur",
+      "aliases": [
+        "Rajarshee Chhatrapati Shahu Maharaj Government Medical College, Kolhapur"
+      ]
+    },
+    {
+      "name": "Rajendra Institute of Medical Sciences, Ranchi",
+      "aliases": [
+        "Rajendra Institute of Medical Sciences, Ranchi"
+      ]
+    },
+    {
+      "name": "Rajiv Gandhi Institute of Medical Sciences Srikakulam",
+      "aliases": [
+        "Rajiv Gandhi Institute of Medical Sciences Srikakulam"
+      ]
+    },
+    {
+      "name": "RAJIV GANDHI INSTITUTE OF MEDICAL SCIENCES",
+      "aliases": [
+        "RAJIV GANDHI INSTITUTE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "RAJIV GANDHI MEDICAL COLLEGE KALWA THANE",
+      "aliases": [
+        "RAJIV GANDHI MEDICAL COLLEGE KALWA THANE"
+      ]
+    },
+    {
+      "name": "Rajkiya Medical College, Jalaun",
+      "aliases": [
+        "Rajkiya Medical College, Jalaun"
+      ]
+    },
+    {
+      "name": "Rajmata Shrimati Devendra Kumari Singhdeo Government Medical College, Ambikapur",
+      "aliases": [
+        "Rajmata Shrimati Devendra Kumari Singhdeo Government Medical College, Ambikapur"
+      ]
+    },
+    {
+      "name": "Rangaraya Medical College",
+      "aliases": [
+        "Rangaraya Medical College"
+      ]
+    },
+    {
+      "name": "Rani Durgavati Medical College, Banda",
+      "aliases": [
+        "Rani Durgavati Medical College, Banda"
+      ]
+    },
+    {
+      "name": "Ravindra Nath Tagore Medical College, Udaipur",
+      "aliases": [
+        "Ravindra Nath Tagore Medical College, Udaipur"
+      ]
+    },
+    {
+      "name": "REGIONAL CANCER CENTRE",
+      "aliases": [
+        "REGIONAL CANCER CENTRE"
+      ]
+    },
+    {
+      "name": "Regional Institute of Medical Sciences, Imphal",
+      "aliases": [
+        "Regional Institute of Medical Sciences, Imphal"
+      ]
+    },
+    {
+      "name": "Regional Institute of Ophthalmology",
+      "aliases": [
+        "Regional Institute of Ophthalmology"
+      ]
+    },
+    {
+      "name": "Rims Medical College, Ongole",
+      "aliases": [
+        "Rims Medical College, Ongole"
+      ]
+    },
+    {
+      "name": "RUHS COLLEGE OF MEDICAL SCIENCES",
+      "aliases": [
+        "RUHS COLLEGE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "S.V. Medical College, Tirupathi",
+      "aliases": [
+        "S.V. Medical College, Tirupathi"
+      ]
+    },
+    {
+      "name": "Sanjay Gandhi Institute of Trauma and Orthopaedics",
+      "aliases": [
+        "Sanjay Gandhi Institute of Trauma and Orthopaedics"
+      ]
+    },
+    {
+      "name": "Sanjay Gandhi Postgarduate Institute of Medical Sciences",
+      "aliases": [
+        "Sanjay Gandhi Postgarduate Institute of Medical Sciences"
+      ]
+    },
+    {
+      "name": "Sardar Patel Medical College, Bikaner",
+      "aliases": [
+        "Sardar Patel Medical College, Bikaner"
+      ]
+    },
+    {
+      "name": "Sarojini Naidu Medical College, AGRA",
+      "aliases": [
+        "Sarojini Naidu Medical College, AGRA"
+      ]
+    },
+    {
+      "name": "Sawai Man Singh Medical College, JAIPUR",
+      "aliases": [
+        "Sawai Man Singh Medical College, JAIPUR"
+      ]
+    },
+    {
+      "name": "SDS Tuberculosis Research Centre and Rajiv Gandhi Institute of Chest Diseases",
+      "aliases": [
+        "SDS Tuberculosis Research Centre and Rajiv Gandhi Institute of Chest Diseases"
+      ]
+    },
+    {
+      "name": "Shaheed Hasan Khan Mewati Government Medical College",
+      "aliases": [
+        "Shaheed Hasan Khan Mewati Government Medical College"
+      ]
+    },
+    {
+      "name": "Shaheed Nirmal Mahto Medical College & Hospital",
+      "aliases": [
+        "Shaheed Nirmal Mahto Medical College & Hospital"
+      ]
+    },
+    {
+      "name": "Shaikh-Ul-Hind Maulana Mahmood Hasan Medical College, Saharanpur",
+      "aliases": [
+        "Shaikh-Ul-Hind Maulana Mahmood Hasan Medical College, Saharanpur"
+      ]
+    },
+    {
+      "name": "Sher-i-Kashmir Institute of Medical Sciences, Srinagar,J&K",
+      "aliases": [
+        "Sher-i-Kashmir Institute of Medical Sciences, Srinagar,J&K"
+      ]
+    },
+    {
+      "name": "SHIMOGA INSTITUTE OF MEDICAL SCIENCES",
+      "aliases": [
+        "SHIMOGA INSTITUTE OF MEDICAL SCIENCES"
+      ]
+    },
+    {
+      "name": "Shri Atal Bihari Vajpayee Medical College & Research Institute, Bengaluru",
+      "aliases": [
+        "Shri Atal Bihari Vajpayee Medical College & Research Institute, Bengaluru"
+      ]
+    },
+    {
+      "name": "Shri Lal Bahadur Shastri Government Medical College and Hospital",
+      "aliases": [
+        "Shri Lal Bahadur Shastri Government Medical College and Hospital"
+      ]
+    },
+    {
+      "name": "Shri Vasantrao Naik Govt Medical College Yavatmal",
+      "aliases": [
+        "Shri Vasantrao Naik Govt Medical College Yavatmal"
+      ]
+    },
+    {
+      "name": "Shrikrishna Medical College & Hospital, Muzaffarpur",
+      "aliases": [
+        "Shrikrishna Medical College & Hospital, Muzaffarpur"
+      ]
+    },
+    {
+      "name": "Siddhartha Medical College, Vijayawada",
+      "aliases": [
+        "Siddhartha Medical College, Vijayawada"
+      ]
+    },
+    {
+      "name": "Silchar Medical College, Silchar",
+      "aliases": [
+        "Silchar Medical College, Silchar"
+      ]
+    },
+    {
+      "name": "SJP Medical College, Bharatpur",
+      "aliases": [
+        "SJP Medical College, Bharatpur"
+      ]
+    },
+    {
+      "name": "Smt. G. R. Doshi and Smt. K. M. Mehta Institute of Kidney Diseases & Research Centre Dr. H. L. Trivedi Institute of Transplantation Sciences (IKDRC-ITS)",
+      "aliases": [
+        "Smt. G. R. Doshi and Smt. K. M. Mehta Institute of Kidney Diseases & Research Centre Dr. H. L. Trivedi Institute of Transplantation Sciences (IKDRC-ITS)"
+      ]
+    },
+    {
+      "name": "Sri Bhausaheb Hire Government Medical College",
+      "aliases": [
+        "Sri Bhausaheb Hire Government Medical College"
+      ]
+    },
+    {
+      "name": "Sri Venkateswara Institute of Medical Sciences (SVIMS), A State University estd. by Govt. of A.P.",
+      "aliases": [
+        "Sri Venkateswara Institute of Medical Sciences (SVIMS), A State University estd. by Govt. of A.P."
+      ]
+    },
+    {
+      "name": "Srirama Chandra Bhanja Medical College, CUTTACK",
+      "aliases": [
+        "Srirama Chandra Bhanja Medical College, CUTTACK"
+      ]
+    },
+    {
+      "name": "STANLEY MEDICAL COLLEGE",
+      "aliases": [
+        "STANLEY MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "SWAMI RAMANAND TEERTH RURAL GOVERNMENT MEDICAL COLLEGE AMBAJOGAI",
+      "aliases": [
+        "SWAMI RAMANAND TEERTH RURAL GOVERNMENT MEDICAL COLLEGE AMBAJOGAI"
+      ]
+    },
+    {
+      "name": "TATA MEMORIAL CENTRE, MUMBAI",
+      "aliases": [
+        "TATA MEMORIAL CENTRE, MUMBAI"
+      ]
+    },
+    {
+      "name": "Tezpur Medical College",
+      "aliases": [
+        "Tezpur Medical College"
+      ]
+    },
+    {
+      "name": "THANJAVUR MEDICAL COLLEGE, THANJAVUR",
+      "aliases": [
+        "THANJAVUR MEDICAL COLLEGE, THANJAVUR"
+      ]
+    },
+    {
+      "name": "Thiruvarur Govt.Medical College",
+      "aliases": [
+        "Thiruvarur Govt.Medical College"
+      ]
+    },
+    {
+      "name": "Tirunelveli Medical College",
+      "aliases": [
+        "Tirunelveli Medical College"
+      ]
+    },
+    {
+      "name": "TOPIWALA NATIONAL MEDICAL COLLEGE",
+      "aliases": [
+        "TOPIWALA NATIONAL MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "Umanath Singh Autonomous State Medical College, Jaunpur, U.P",
+      "aliases": [
+        "Umanath Singh Autonomous State Medical College, Jaunpur, U.P"
+      ]
+    },
+    {
+      "name": "University College of Medical Sciences",
+      "aliases": [
+        "University College of Medical Sciences"
+      ]
+    },
+    {
+      "name": "Uttar Pradesh University of Medical Sciences, Saifai, Etawah",
+      "aliases": [
+        "Uttar Pradesh University of Medical Sciences, Saifai, Etawah"
+      ]
+    },
+    {
+      "name": "Vallabhbhai Patel Chest Institute, Delhi",
+      "aliases": [
+        "Vallabhbhai Patel Chest Institute, Delhi"
+      ]
+    },
+    {
+      "name": "VARDHMAN INSTITUTE OF MEDICAL SCIENCES, NALANDA",
+      "aliases": [
+        "VARDHMAN INSTITUTE OF MEDICAL SCIENCES, NALANDA"
+      ]
+    },
+    {
+      "name": "Vardhman Mahavir Medical College, , New Delhi",
+      "aliases": [
+        "Vardhman Mahavir Medical College, , New Delhi"
+      ]
+    },
+    {
+      "name": "Veer Chandra Singh Garhwali Govt. Institute of Medical Science & Research",
+      "aliases": [
+        "Veer Chandra Singh Garhwali Govt. Institute of Medical Science & Research"
+      ]
+    },
+    {
+      "name": "VIJANAGARA INSTITUTE OF MEDICAL SCIENCES BALLARI",
+      "aliases": [
+        "VIJANAGARA INSTITUTE OF MEDICAL SCIENCES BALLARI"
+      ]
+    },
+    {
+      "name": "VSS INSTITUTE OF MEDICAL SCIENCES AND RESEARCH,BURLA",
+      "aliases": [
+        "VSS INSTITUTE OF MEDICAL SCIENCES AND RESEARCH,BURLA"
+      ]
+    }
+  ],
+  "UP": [
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, AYODHYA",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, AYODHYA"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, BAHRAICH",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, BAHRAICH"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, BASTI",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, BASTI"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, DEORIA",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, DEORIA"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, FATEHPUR",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, FATEHPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, FIROZABAD",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, FIROZABAD"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, HARDOI",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, HARDOI"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, JAUNPUR",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, JAUNPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, MIRZAPUR",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, MIRZAPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, SHAHJAHANPUR",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, SHAHJAHANPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "AUTONOMOUS MEDICAL COLLEGE, SIDDHARTHNAGAR",
+      "aliases": [
+        "AUTONOMOUS MEDICAL COLLEGE, SIDDHARTHNAGAR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "BABA RAGHAV DAS MEDICAL COLLEGE, GORAKHPUR",
+      "aliases": [
+        "BABA RAGHAV DAS MEDICAL COLLEGE, GORAKHPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "DR. RAM MANOHAR LOHIA INSTITUTE OF MEDICAL SCIENCES, LUCKNOW",
+      "aliases": [
+        "DR. RAM MANOHAR LOHIA INSTITUTE OF MEDICAL SCIENCES, LUCKNOW"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GANESH SHANKAR VIDYARTHI MEMORIAL MEDICAL COLLEGE, KANPUR",
+      "aliases": [
+        "GANESH SHANKAR VIDYARTHI MEMORIAL MEDICAL COLLEGE, KANPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT INSTITUTE OF MEDICAL SCIENCES, GREATER NOIDA",
+      "aliases": [
+        "GOVERNMENT INSTITUTE OF MEDICAL SCIENCES, GREATER NOIDA"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, AMBEDKAR NAGAR",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, AMBEDKAR NAGAR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, AZAMGARH",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, AZAMGARH"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, BADAUN",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, BADAUN"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, BANDA",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, BANDA"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, JALAUN",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, JALAUN"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, KANNAUJ",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, KANNAUJ"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "GOVERNMENT MEDICAL COLLEGE, SAHARANPUR",
+      "aliases": [
+        "GOVERNMENT MEDICAL COLLEGE, SAHARANPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "INSTITUTE OF MENTAL HEALTH & HOSPITAL, AGRA",
+      "aliases": [
+        "INSTITUTE OF MENTAL HEALTH & HOSPITAL, AGRA"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "King George's Medical University, Lucknow",
+      "aliases": [
+        "King George's Medical University, Lucknow"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "LALA LAJPAT RAI MEMORIAL MEDICAL COLLEGE, MEERUT",
+      "aliases": [
+        "LALA LAJPAT RAI MEMORIAL MEDICAL COLLEGE, MEERUT"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "MAHARANI LAXMI BAI MEDICAL COLLEGE, JHANSI",
+      "aliases": [
+        "MAHARANI LAXMI BAI MEDICAL COLLEGE, JHANSI"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "MOTI LAL NEHRU MEDICAL COLLEGE, PRAYAGRAJ",
+      "aliases": [
+        "MOTI LAL NEHRU MEDICAL COLLEGE, PRAYAGRAJ"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "POST GRADUATE INSTITUTE OF CHILD HEALTH, NOIDA",
+      "aliases": [
+        "POST GRADUATE INSTITUTE OF CHILD HEALTH, NOIDA"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "REGIONAL INSTITUTE OF OPHTHALMOLOGY, SITAPUR",
+      "aliases": [
+        "REGIONAL INSTITUTE OF OPHTHALMOLOGY, SITAPUR"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "Sanjay Gandhi Postgraduate Institute of Medical Sciences, Lucknow",
+      "aliases": [
+        "Sanjay Gandhi Postgraduate Institute of Medical Sciences, Lucknow"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "Sarojini Naidu Medical College, Agra",
+      "aliases": [
+        "Sarojini Naidu Medical College, Agra"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "UTTAR PRADESH UNIVERSITY OF MEDICAL SCIENCES, SAIFAI, ETAWAH",
+      "aliases": [
+        "UTTAR PRADESH UNIVERSITY OF MEDICAL SCIENCES, SAIFAI, ETAWAH"
+      ],
+      "type": "GOVERNMENT"
+    },
+    {
+      "name": "CAREER INSTITUTE OF MEDICAL SCIENCES, LKO",
+      "aliases": [
+        "CAREER INSTITUTE OF MEDICAL SCIENCES, LKO"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "ERA MEDICAL COLLEGE LUCKNOW",
+      "aliases": [
+        "ERA MEDICAL COLLEGE LUCKNOW"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "ERA MEDICAL COLLEGE LUCKNOW (MUSLIM MINORITY)",
+      "aliases": [
+        "ERA MEDICAL COLLEGE LUCKNOW (MUSLIM MINORITY)"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "F.H. MEDICAL COLLEGE & HOSPITAL, AGRA",
+      "aliases": [
+        "F.H. MEDICAL COLLEGE & HOSPITAL, AGRA"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "F.H. MEDICAL COLLEGE & HOSPITAL, AGRA (MUSLIM MINORITY)",
+      "aliases": [
+        "F.H. MEDICAL COLLEGE & HOSPITAL, AGRA (MUSLIM MINORITY)"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "G.S. MEDICAL COLLEGE, HAPUR",
+      "aliases": [
+        "G.S. MEDICAL COLLEGE, HAPUR"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "HERITAGE MEDICAL COLLEGE, VARANASI",
+      "aliases": [
+        "HERITAGE MEDICAL COLLEGE, VARANASI"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "HIND MEDICAL COLLEGE BARABANKI",
+      "aliases": [
+        "HIND MEDICAL COLLEGE BARABANKI"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "HIND MEDICAL COLLEGE, SITAPUR",
+      "aliases": [
+        "HIND MEDICAL COLLEGE, SITAPUR"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "INTEGRAL INSTITUTE OF MEDICAL SCIENCES, LUCKNOW",
+      "aliases": [
+        "INTEGRAL INSTITUTE OF MEDICAL SCIENCES, LUCKNOW"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "INTEGRAL INSTITUTE OF MEDICAL SCIENCES, LUCKNOW (MUSLIM MINORITY)",
+      "aliases": [
+        "INTEGRAL INSTITUTE OF MEDICAL SCIENCES, LUCKNOW (MUSLIM MINORITY)"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "K.D. MEDICAL COLLEGE, MATHURA",
+      "aliases": [
+        "K.D. MEDICAL COLLEGE, MATHURA"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "K.M. MEDICAL COLLEGE, MATHURA",
+      "aliases": [
+        "K.M. MEDICAL COLLEGE, MATHURA"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "MAYO INSTITUTE OF MEDICAL SCIENCE, BARABANKI",
+      "aliases": [
+        "MAYO INSTITUTE OF MEDICAL SCIENCE, BARABANKI"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "MUZAFFAR NAGAR MEDICAL COLLEGE MUZAFFAR NAGAR",
+      "aliases": [
+        "MUZAFFAR NAGAR MEDICAL COLLEGE MUZAFFAR NAGAR"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "Naraina Medical College & Research Centre, Kanpur",
+      "aliases": [
+        "Naraina Medical College & Research Centre, Kanpur"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "NATIONAL CAPITAL MEDICAL COLLEGE, MEERUT",
+      "aliases": [
+        "NATIONAL CAPITAL MEDICAL COLLEGE, MEERUT"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "NOIDA INTERNATIONAL INSTITUTE OF MEDICAL SCIENCES, GREATER NOIDA",
+      "aliases": [
+        "NOIDA INTERNATIONAL INSTITUTE OF MEDICAL SCIENCES, GREATER NOIDA"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "PRASAD MEDICAL COLLEGE, LUCKNOW",
+      "aliases": [
+        "PRASAD MEDICAL COLLEGE, LUCKNOW"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "RAJSHREE MEDICAL RESEARCH INSTITUTE BAREILLY",
+      "aliases": [
+        "RAJSHREE MEDICAL RESEARCH INSTITUTE BAREILLY"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "RAMA MEDICAL COLLEGE HOSPITAL & RESEARCH CENTRE, HAPUR",
+      "aliases": [
+        "RAMA MEDICAL COLLEGE HOSPITAL & RESEARCH CENTRE, HAPUR"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "RAMA MEDICAL COLLEGE KANPUR",
+      "aliases": [
+        "RAMA MEDICAL COLLEGE KANPUR"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "Rohilkhand Medical College, Bareilly",
+      "aliases": [
+        "Rohilkhand Medical College, Bareilly"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "SARASWATI INSTITUTE OF MEDICAL SCIENCES HAPUR",
+      "aliases": [
+        "SARASWATI INSTITUTE OF MEDICAL SCIENCES HAPUR"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "SCHOOL OF MEDICAL SCIENCES & RESEARCH, SHARDA UNIVERSITY G. NOIDA",
+      "aliases": [
+        "SCHOOL OF MEDICAL SCIENCES & RESEARCH, SHARDA UNIVERSITY G. NOIDA"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "Shri Ram Murti Institute of Medical Sciences, Bareilly",
+      "aliases": [
+        "Shri Ram Murti Institute of Medical Sciences, Bareilly"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "SUBHARATI MEDICAL COLLEGE, MEERUT",
+      "aliases": [
+        "SUBHARATI MEDICAL COLLEGE, MEERUT"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "T.S. Misra Medical College & Hospital, Lucknow",
+      "aliases": [
+        "T.S. Misra Medical College & Hospital, Lucknow"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "TEERTHANKER MAHAVEER UNIVERSITY, MORADABAD",
+      "aliases": [
+        "TEERTHANKER MAHAVEER UNIVERSITY, MORADABAD"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "United Medical College, Prayagraj",
+      "aliases": [
+        "United Medical College, Prayagraj"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "Varunarjun Medical College, Shahjahanpur",
+      "aliases": [
+        "Varunarjun Medical College, Shahjahanpur"
+      ],
+      "type": "PRIVATE"
+    },
+    {
+      "name": "Venkateshwara Medical College, Amroha",
+      "aliases": [
+        "Venkateshwara Medical College, Amroha"
+      ],
+      "type": "PRIVATE"
+    }
+  ],
+  "RAJASTHAN": [
+    {
+      "name": "SMS Medical College, Jaipur",
+      "aliases": [
+        "SMS Medical College, Jaipur"
+      ]
+    },
+    {
+      "name": "Dr. S. N. Medical College, Jodhpur",
+      "aliases": [
+        "Dr. S. N. Medical College, Jodhpur"
+      ]
+    },
+    {
+      "name": "R.N.T. Medical College, Udaipur",
+      "aliases": [
+        "R.N.T. Medical College, Udaipur"
+      ]
+    },
+    {
+      "name": "J.L.N. Medical College, Ajmer",
+      "aliases": [
+        "J.L.N. Medical College, Ajmer"
+      ]
+    },
+    {
+      "name": "Government Medical College, Kota",
+      "aliases": [
+        "Government Medical College, Kota"
+      ]
+    },
+    {
+      "name": "S.P. Medical College, Bikaner",
+      "aliases": [
+        "S.P. Medical College, Bikaner"
+      ]
+    },
+    {
+      "name": "RUHS College of Medical Sciences",
+      "aliases": [
+        "RUHS College of Medical Sciences"
+      ]
+    },
+    {
+      "name": "Jhalawar Medical College, Jhalawar",
+      "aliases": [
+        "Jhalawar Medical College, Jhalawar"
+      ]
+    },
+    {
+      "name": "Shri Jagannath Pahadiya Medical College, Bharatpur",
+      "aliases": [
+        "Shri Jagannath Pahadiya Medical College, Bharatpur"
+      ]
+    },
+    {
+      "name": "ESIC Medical College and Hospital, Alwar",
+      "aliases": [
+        "ESIC Medical College and Hospital, Alwar"
+      ]
+    },
+    {
+      "name": "Mahatma Gandhi Medical College and Hospital, Jaipur",
+      "aliases": [
+        "Mahatma Gandhi Medical College and Hospital, Jaipur"
+      ]
+    },
+    {
+      "name": "American International Institute of Medical Sciences",
+      "aliases": [
+        "American International Institute of Medical Sciences"
+      ]
+    },
+    {
+      "name": "Ananta Institute of Medical Sciences and Research Centre, Rajsamand",
+      "aliases": [
+        "Ananta Institute of Medical Sciences and Research Centre, Rajsamand"
+      ]
+    },
+    {
+      "name": "Dr. S.S. Tantia Medical College, Hospital and Research Centre, Sri Ganganagar",
+      "aliases": [
+        "Dr. S.S. Tantia Medical College, Hospital and Research Centre, Sri Ganganagar"
+      ]
+    },
+    {
+      "name": "National Institute of Medical Sciences & Research (NIMS), Jaipur",
+      "aliases": [
+        "National Institute of Medical Sciences & Research (NIMS), Jaipur"
+      ]
+    },
+    {
+      "name": "Geetanjali Medical College & Hospital, Udaipur",
+      "aliases": [
+        "Geetanjali Medical College & Hospital, Udaipur"
+      ]
+    },
+    {
+      "name": "Pacific Medical College & Hospital, Udaipur",
+      "aliases": [
+        "Pacific Medical College & Hospital, Udaipur"
+      ]
+    },
+    {
+      "name": "Pacific Institute of Medical Sciences, Udaipur",
+      "aliases": [
+        "Pacific Institute of Medical Sciences, Udaipur"
+      ]
+    },
+    {
+      "name": "MGH Hospital, Bhilwara",
+      "aliases": [
+        "MGH Hospital, Bhilwara"
+      ]
+    },
+    {
+      "name": "GMC Bhilwara",
+      "aliases": [
+        "GMC Bhilwara"
+      ]
+    },
+    {
+      "name": "GMC Churu",
+      "aliases": [
+        "GMC Churu"
+      ]
+    },
+    {
+      "name": "GMC Dungarpur",
+      "aliases": [
+        "GMC Dungarpur"
+      ]
+    },
+    {
+      "name": "GMC Pali",
+      "aliases": [
+        "GMC Pali"
+      ]
+    },
+    {
+      "name": "S K Hospital, Sikar",
+      "aliases": [
+        "S K Hospital, Sikar"
+      ]
+    },
+    {
+      "name": "RBM Hospital, Bharatpur",
+      "aliases": [
+        "RBM Hospital, Bharatpur"
+      ]
+    },
+    {
+      "name": "Government Hospital, Alwar",
+      "aliases": [
+        "Government Hospital, Alwar"
+      ]
+    },
+    {
+      "name": "Govt. RDBP Jaipuria Hospital, Jaipur",
+      "aliases": [
+        "Govt. RDBP Jaipuria Hospital, Jaipur"
+      ]
+    },
+    {
+      "name": "Government BDK Hospital, Jhunjhunu",
+      "aliases": [
+        "Government BDK Hospital, Jhunjhunu"
+      ]
+    },
+    {
+      "name": "Govt. Amritkaur Hospital, Beawar",
+      "aliases": [
+        "Govt. Amritkaur Hospital, Beawar"
+      ]
+    },
+    {
+      "name": "Government District Hospital, Dholpur",
+      "aliases": [
+        "Government District Hospital, Dholpur"
+      ]
+    },
+    {
+      "name": "District Hospital, Banswara",
+      "aliases": [
+        "District Hospital, Banswara"
+      ]
+    },
+    {
+      "name": "District Hospital, Baran",
+      "aliases": [
+        "District Hospital, Baran"
+      ]
+    },
+    {
+      "name": "District Hospital, Bundi",
+      "aliases": [
+        "District Hospital, Bundi"
+      ]
+    },
+    {
+      "name": "District Hospital, Chittorgarh",
+      "aliases": [
+        "District Hospital, Chittorgarh"
+      ]
+    },
+    {
+      "name": "District Hospital, Hanumangarh",
+      "aliases": [
+        "District Hospital, Hanumangarh"
+      ]
+    },
+    {
+      "name": "District Hospital, Nagaur",
+      "aliases": [
+        "District Hospital, Nagaur"
+      ]
+    },
+    {
+      "name": "District Hospital, Pratapgarh",
+      "aliases": [
+        "District Hospital, Pratapgarh"
+      ]
+    },
+    {
+      "name": "District Hospital, Sirohi",
+      "aliases": [
+        "District Hospital, Sirohi"
+      ]
+    },
+    {
+      "name": "District Hospital, Sri Ganganagar",
+      "aliases": [
+        "District Hospital, Sri Ganganagar"
+      ]
+    },
+    {
+      "name": "District Hospital, Tonk",
+      "aliases": [
+        "District Hospital, Tonk"
+      ]
+    },
+    {
+      "name": "Government Hospital, Sawai Madhopur",
+      "aliases": [
+        "Government Hospital, Sawai Madhopur"
+      ]
+    },
+    {
+      "name": "Government Hospital, Karauli",
+      "aliases": [
+        "Government Hospital, Karauli"
+      ]
+    },
+    {
+      "name": "Govt District Hospital, Kekri, Ajmer",
+      "aliases": [
+        "Govt District Hospital, Kekri, Ajmer"
+      ]
+    },
+    {
+      "name": "Shri Hari Deo Joshi General Hospital, Dungarpur",
+      "aliases": [
+        "Shri Hari Deo Joshi General Hospital, Dungarpur"
+      ]
+    }
+  ],
+  "MP": [
+    {
+      "name": "Gandhi Medical College, Bhopal",
+      "aliases": [
+        "Gandhi Medical College, Bhopal",
+        "GANDHI MEDICAL COLLEGE BHOPAL"
+      ]
+    },
+    {
+      "name": "Gajra Raja Medical College, Gwalior",
+      "aliases": [
+        "Gajra Raja Medical College, Gwalior",
+        "GAJRA RAJA MEDICAL COLLEGE GWALIOR"
+      ]
+    },
+    {
+      "name": "Shyam Shah Medical College, Rewa",
+      "aliases": [
+        "Shyam Shah Medical College, Rewa",
+        "SHYAM SHAH MEDICAL COLLEGE REWA"
+      ]
+    },
+    {
+      "name": "Government Medical College, Ratlam",
+      "aliases": [
+        "Government Medical College, Ratlam"
+      ]
+    },
+    {
+      "name": "Government Medical College, Satna",
+      "aliases": [
+        "Government Medical College, Satna"
+      ]
+    },
+    {
+      "name": "Government Medical College, Datia",
+      "aliases": [
+        "Government Medical College, Datia"
+      ]
+    },
+    {
+      "name": "Government Medical College, Khandwa",
+      "aliases": [
+        "Government Medical College, Khandwa"
+      ]
+    },
+    {
+      "name": "Government Medical College, Jabalpur",
+      "aliases": [
+        "Government Medical College, Jabalpur"
+      ]
+    },
+    {
+      "name": "Government Medical College, Vidisha",
+      "aliases": [
+        "Government Medical College, Vidisha"
+      ]
+    },
+    {
+      "name": "Bundelkhand Medical College, Sagar",
+      "aliases": [
+        "Bundelkhand Medical College, Sagar"
+      ]
+    },
+    {
+      "name": "Government Medical College, Shivpuri",
+      "aliases": [
+        "Government Medical College, Shivpuri"
+      ]
+    },
+    {
+      "name": "Amaltas Institute of Medical Sciences, Dewas",
+      "aliases": [
+        "Amaltas Institute of Medical Sciences, Dewas"
+      ]
+    },
+    {
+      "name": "R.D. Gardi Medical College, Ujjain",
+      "aliases": [
+        "R.D. Gardi Medical College, Ujjain",
+        "RD GARDI MEDICAL COLLEGE UJJAIN",
+        "R D GARDI MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "People’s College of Medical Sciences & Research Centre, Bhopal",
+      "aliases": [
+        "People’s College of Medical Sciences & Research Centre, Bhopal",
+        "PEOPLES COLLEGE OF MEDICAL SCIENCE BHOPAL",
+        "PEOPLES COLLEGE OF MEDICAL SCIENCES BHOPAL"
+      ]
+    },
+    {
+      "name": "Sri Aurobindo Institute of Medical Sciences, Indore",
+      "aliases": [
+        "Sri Aurobindo Institute of Medical Sciences, Indore",
+        "SRI AUROBINDO INSTITUTE OF MEDICAL SCIENCE INDORE"
+      ]
+    },
+    {
+      "name": "Chirayu Medical College & Hospital, Bhopal",
+      "aliases": [
+        "Chirayu Medical College & Hospital, Bhopal",
+        "CHIRAYU MEDICAL COLLEGE AND HOSPITAL BHOPAL"
+      ]
+    },
+    {
+      "name": "L.N. Medical College, Bhopal",
+      "aliases": [
+        "L.N. Medical College, Bhopal"
+      ]
+    },
+    {
+      "name": "Gwalior Mansik Arogyashala, Gwalior",
+      "aliases": [
+        "Gwalior Mansik Arogyashala, Gwalior"
+      ]
+    }
+  ],
+  "BIHAR": [
+    {
+      "name": "P.M.C. Patna",
+      "aliases": [
+        "P.M.C. Patna",
+        "P.M.C.PATNA",
+        "PATNA MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "N.M.C. Patna",
+      "aliases": [
+        "N.M.C. Patna",
+        "N.M.C. PATNA",
+        "NALANDA MEDICAL COLLEGE PATNA"
+      ]
+    },
+    {
+      "name": "I.G.I.M.S. Patna",
+      "aliases": [
+        "I.G.I.M.S. Patna",
+        "I.G.I.M.S. PATNA",
+        "IGIMS PATNA"
+      ]
+    },
+    {
+      "name": "D.M.C. Laheriasarai",
+      "aliases": [
+        "D.M.C. Laheriasarai",
+        "D.M.C.LAHERIASARAI",
+        "DARBHANGA MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "S.K.M.C. Muzaffarpur",
+      "aliases": [
+        "S.K.M.C. Muzaffarpur",
+        "S.K.M.C. MUZAFFARPUR",
+        "SRI KRISHNA MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "A.N.M.M.C. Gaya",
+      "aliases": [
+        "A.N.M.M.C. Gaya",
+        "A.N.M.M.C. GAYA",
+        "ANUGRAH NARAYAN MAGADH MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "J.L.N.M.C. Bhagalpur",
+      "aliases": [
+        "J.L.N.M.C. Bhagalpur",
+        "J.L.N.M.C. BHAGALPUR",
+        "JAWAHARLAL NEHRU MEDICAL COLLEGE BHAGALPUR"
+      ]
+    },
+    {
+      "name": "G.M.C. Bettiah",
+      "aliases": [
+        "G.M.C. Bettiah",
+        "G.M.C. BETTIAH",
+        "GOVERNMENT MEDICAL COLLEGE BETTIAH"
+      ]
+    },
+    {
+      "name": "J.K.T.M.C. Madhepura",
+      "aliases": [
+        "J.K.T.M.C. Madhepura"
+      ]
+    },
+    {
+      "name": "G.M.C. Purnea",
+      "aliases": [
+        "G.M.C. Purnea"
+      ]
+    },
+    {
+      "name": "B.M.I.M.S., Pawapuri, Nalanda",
+      "aliases": [
+        "B.M.I.M.S., Pawapuri, Nalanda"
+      ]
+    },
+    {
+      "name": "BIMHAS Koilwar, Bhojpur",
+      "aliases": [
+        "BIMHAS Koilwar, Bhojpur"
+      ]
+    },
+    {
+      "name": "K.M.C. Katihar",
+      "aliases": [
+        "K.M.C. Katihar",
+        "K.M.C. KATIHAR",
+        "KATIHAR MEDICAL COLLEGE"
+      ]
+    },
+    {
+      "name": "MGMMC & LSK HOS, Kishanganj",
+      "aliases": [
+        "MGMMC & LSK HOS, Kishanganj",
+        "MGMMC LSK HOS KISHANGANJ",
+        "MGMMC LSK HOSPITAL KISHANGANJ"
+      ]
+    },
+    {
+      "name": "N.M.C. & H., Sasaram",
+      "aliases": [
+        "N.M.C. & H., Sasaram",
+        "N.M.C H SASARAM",
+        "N M C H SASARAM"
+      ]
+    },
+    {
+      "name": "Madhubani Medical College, Madhubani",
+      "aliases": [
+        "Madhubani Medical College, Madhubani",
+        "MADHUBANI MEDICAL COLLEGE MADHUBANI"
+      ]
+    },
+    {
+      "name": "Netaji Subhas Medical College & Hospital, Bihta",
+      "aliases": [
+        "Netaji Subhas Medical College & Hospital, Bihta"
+      ]
+    },
+    {
+      "name": "Lord Buddha Koshi Medical College & Hospital, Saharsa",
+      "aliases": [
+        "Lord Buddha Koshi Medical College & Hospital, Saharsa",
+        "LORD BUDHA KOSHI MEDICAL COLLEGE HOSPITAL SAHARSA",
+        "AND HOSPITAL SAHARSA",
+        "COLLEGE HOSPITAL SAHARSA"
+      ]
+    },
+    {
+      "name": "L.N.J.P. Hospital, Patna",
+      "aliases": [
+        "L.N.J.P. Hospital, Patna"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Chapra (Saran)",
+      "aliases": [
+        "Sadar Hospital, Chapra (Saran)"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Gopalganj",
+      "aliases": [
+        "Sadar Hospital, Gopalganj"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Jehanabad",
+      "aliases": [
+        "Sadar Hospital, Jehanabad"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Khagaria",
+      "aliases": [
+        "Sadar Hospital, Khagaria"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Lakhisarai",
+      "aliases": [
+        "Sadar Hospital, Lakhisarai"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Madhubani",
+      "aliases": [
+        "Sadar Hospital, Madhubani"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Motihari",
+      "aliases": [
+        "Sadar Hospital, Motihari"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Muzaffarpur",
+      "aliases": [
+        "Sadar Hospital, Muzaffarpur"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Nalanda (Bihar Sharif)",
+      "aliases": [
+        "Sadar Hospital, Nalanda (Bihar Sharif)"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Sasaram",
+      "aliases": [
+        "Sadar Hospital, Sasaram"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Sitamarhi",
+      "aliases": [
+        "Sadar Hospital, Sitamarhi"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Siwan",
+      "aliases": [
+        "Sadar Hospital, Siwan"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Madhepura",
+      "aliases": [
+        "Sadar Hospital, Madhepura"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Hajipur, Vaishali",
+      "aliases": [
+        "Sadar Hospital, Hajipur, Vaishali"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Begusarai",
+      "aliases": [
+        "Sadar Hospital, Begusarai"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Araria",
+      "aliases": [
+        "Sadar Hospital, Araria"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Banka",
+      "aliases": [
+        "Sadar Hospital, Banka"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Samastipur",
+      "aliases": [
+        "Sadar Hospital, Samastipur"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Sheohar",
+      "aliases": [
+        "Sadar Hospital, Sheohar"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Buxar",
+      "aliases": [
+        "Sadar Hospital, Buxar"
+      ]
+    },
+    {
+      "name": "Sadar Hospital, Purnea",
+      "aliases": [
+        "Sadar Hospital, Purnea"
+      ]
+    }
+  ],
+  "JHARKHAND": [
+    {
+      "name": "Rajendra Institute of Medical Sciences, Ranchi",
+      "aliases": [
+        "Rajendra Institute of Medical Sciences, Ranchi",
+        "RAJENDRA INSTITUTE OF MEDICAL SCIENCES RANCHI",
+        "JENDRA INSTITUTE OF MEDICAL SCIENCES RANCHI"
+      ]
+    },
+    {
+      "name": "Mahatma Gandhi Memorial Medical College, Jamshedpur",
+      "aliases": [
+        "Mahatma Gandhi Memorial Medical College, Jamshedpur",
+        "MAHATMA GANDHI MEMORIAL MEDICAL COLLEGE JAMSHEDPUR",
+        "HATMA GANDHI MEMORIAL MEDICAL COLLEGE JAMSHEDPUR"
+      ]
+    },
+    {
+      "name": "Shahid Nirmal Mahato Medical College, Dhanbad",
+      "aliases": [
+        "Shahid Nirmal Mahato Medical College, Dhanbad",
+        "SNMMCH DHANBAD"
+      ]
+    }
+  ]
+};
+
+function getCollegeMasterEntries() {
+  return CANONICAL_COLLEGE_MASTER[state.counselling] || [];
+}
+
+function collegeMatchScore(raw, entry) {
+  const r=norm(raw), rTokens=[...new Set(r.split(' ').filter(t=>t.length>2))];
+  if(!r) return 0;
+  let best=0;
+  for(const candidate of [entry.name,...(entry.aliases||[])]) {
+    const c=norm(candidate);
+    if(!c) continue;
+    if(r===c) best=Math.max(best,1200);
+    else if(r.includes(c)) best=Math.max(best,1000 + Math.min(100,c.length/8));
+    const cTokens=[...new Set(c.split(' ').filter(t=>t.length>2))];
+    const common=cTokens.filter(t=>rTokens.includes(t)).length;
+    if(cTokens.length) best=Math.max(best, (common/cTokens.length)*820);
+  }
+  return best;
+}
+
+function resolveCanonicalCollege(raw) {
+  const text=String(raw||'').trim();
+  if(!text) return '';
+  const entries=getCollegeMasterEntries();
+  let best=null, second=0;
+  for(const entry of entries) {
+    const score=collegeMatchScore(text,entry);
+    if(score>(best?.score||0)) { second=best?.score||0; best={entry,score}; }
+    else if(score>second) second=score;
+  }
+  if(!best || best.score<360) return '';
+  if(best.score<900 && best.score-second<80) return '';
+  return best.entry.name;
+}
+
+// ---------------------------------------------------------------------------
 // College / institute cleaning + autocomplete
 // The source PDFs contain repeated addresses, page fragments, OCR damage and
 // concatenated neighbouring cells. We keep the underlying source untouched,
@@ -485,9 +3215,8 @@ function collegeSearchTerms(raw, display, stateName){
 }
 
 function canonicalCollegeName(...values){
-  const raws=values.map(v=>String(v||"").trim()).filter(Boolean);
-  for(const raw of raws){
-    const c=cleanCollegeName(raw);
+  for(const raw of values.map(v=>String(v||"").trim()).filter(Boolean)){
+    const c=resolveCanonicalCollege(raw);
     if(c) return c;
   }
   return "";
@@ -502,34 +3231,8 @@ function isStrongCollegeName(v){
 }
 
 function extractCollegeCandidates(raw){
-  const text=String(raw||'').replace(/\uFEFF/g,'').replace(/[\u2013\u2014]/g,'-').replace(/\s+/g,' ').trim();
-  if(!text) return [];
-
-  // AIQ extraction often concatenates multiple institute cells. A 6-digit
-  // pincode is a reliable boundary between such cells. We take the first
-  // meaningful comma-separated segment from each chunk and then normalize it.
-  const chunks=text.split(/\b\d{6}\b/g);
-  const out=[];
-  const seen=new Set();
-  for(let chunk of chunks){
-    chunk=stripCollegeJunkStart(chunk);
-    if(!chunk) continue;
-    let first=(chunk.split(/\s*,\s*/)[0]||'').trim();
-    first=stripCollegeJunkStart(first);
-    if(first.length<4) continue;
-    const alias=applyCollegeAlias(first);
-    const candidate=alias || cleanCollegeName(first);
-    if(!isStrongCollegeName(candidate)) continue;
-    const key=norm(candidate);
-    if(!seen.has(key)){ seen.add(key); out.push(candidate); }
-  }
-
-  // Fallback for clean single-record rows that have no pincode.
-  if(!out.length){
-    const candidate=canonicalCollegeName(text);
-    if(isStrongCollegeName(candidate)) out.push(candidate);
-  }
-  return out;
+  const c=resolveCanonicalCollege(raw);
+  return c?[c]:[];
 }
 
 function extractCourseCandidates(raw){
@@ -554,26 +3257,7 @@ function extractCourseCandidates(raw){
 }
 
 function buildCollegeMaster(){
-  const map=new Map();
-  const add=(name, raw='')=>{
-    if(!isStrongCollegeName(name)) return;
-    const key=norm(name);
-    let item=map.get(key);
-    if(!item){ item={name,search:new Set()}; map.set(key,item); }
-    if(raw) item.search.add(norm(raw));
-    item.search.add(norm(name));
-  };
-
-  for(const x of state.allotments){
-    for(const c of extractCollegeCandidates(x.college)) add(c,x.college);
-  }
-  for(const x of state.movement){
-    for(const c of extractCollegeCandidates(x.college)) add(c,x.college);
-  }
-
-  state.collegeMaster=[...map.values()]
-    .map(x=>({...x,searchText:[...x.search].filter(Boolean).join(' ')}))
-    .sort((a,b)=>a.name.localeCompare(b.name,'en',{sensitivity:'base'}));
+  state.collegeMaster=getCollegeMasterEntries().map(x=>({name:x.name,searchText:norm([x.name,...(x.aliases||[])].join(' '))}));
 }
 
 function setupCollegeAutocomplete(inputId, menuId){
@@ -672,18 +3356,11 @@ function normalizeRecord(x){
   const rawCollege=String(x.college||"");
   const rawCourse=String(x.course||"");
   const rawCategory=String(x.category||"");
-
   const course=canonicalCourse(rawCourse,rawCategory,rawCollege);
-  const collegeA=canonicalCollegeName(rawCollege);
-  const collegeB=canonicalCollegeName(rawCourse);
-
-  let college=collegeA;
-  if(looksLikeSeatMarker(rawCollege) && collegeB && !looksLikeRemark(rawCourse) && !canonicalCourse(rawCourse)) college=collegeB;
-  if(!college && collegeB && !looksLikeRemark(rawCourse)) college=collegeB;
-  if(canonicalCourse(rawCollege) && looksLikeRemark(rawCourse)) college="";
-
-  const collegeSearch=collegeSearchTerms(rawCollege,college,x.state||"");
-  return {...x,_college:college,_course:course,_category:cleanRowCategory(x),_collegeSearch:collegeSearch};
+  let college=resolveCanonicalCollege(rawCollege);
+  if(!college && looksLikeSeatMarker(rawCollege) && !looksLikeRemark(rawCourse)) college=resolveCanonicalCollege(rawCourse);
+  if(!college && state.counselling==='BIHAR') college=resolveCanonicalCollege(rawCourse);
+  return {...x,_college:college,_course:course,_category:cleanRowCategory(x),_collegeSearch:norm([college,rawCollege].join(' '))};
 }
 
 function normalizeDataset(rows){ return rows.map(normalizeRecord); }
@@ -822,28 +3499,28 @@ function clearExplore(){
 }
 
 function buildMovementRows(){
-  const rows=[];
-  for(const x of state.movement){
-    const colleges=extractCollegeCandidates(x.college);
-    const courses=extractCourseCandidates(x.course);
-    // Only accept movement rows where the extraction identifies one institute
-    // and one course. This prevents concatenated PDF cells from being falsely
-    // paired with each other.
-    if(colleges.length!==1 || courses.length!==1) continue;
-    const college=colleges[0], course=courses[0];
-    const item={_college:college,_course:course,_collegeSearch:norm([college,x.college].join(' '))};
-    for(const r of ['R1','R2','R3','STRAY']){
-      const count=Number(x[`allotment_count_${r}`]);
-      const o=Number(x[`opening_rank_${r}`]);
-      const c=Number(x[`closing_rank_${r}`]);
-      if(Number.isFinite(count)&&count>0) item[`allotment_count_${r}`]=(item[`allotment_count_${r}`]||0)+count;
-      if(Number.isFinite(o)&&o>0) item[`opening_rank_${r}`]=item[`opening_rank_${r}`]==null?o:Math.min(item[`opening_rank_${r}`],o);
-      if(Number.isFinite(c)&&c>0) item[`closing_rank_${r}`]=item[`closing_rank_${r}`]==null?c:Math.max(item[`closing_rank_${r}`],c);
-    }
-    if(!Object.keys(item).some(k=>k.startsWith('closing_rank_')||k.startsWith('opening_rank_'))) continue;
-    rows.push(item);
+  const grouped=new Map();
+  for(const x of state.allotments){
+    const college=x._college, course=x._course, round=String(x.round||'').toUpperCase(), rank=Number(x.rank_value);
+    if(!college || !course || !/^R[123]$|^STRAY$/.test(round) || !Number.isFinite(rank) || rank<=0) continue;
+    const key=`${norm(college)}|${norm(course)}|${round}`;
+    let g=grouped.get(key);
+    if(!g) g={_college:college,_course:course,_collegeSearch:norm(college),round};
+    g.minRank=g.minRank==null?rank:Math.min(g.minRank,rank);
+    g.maxRank=g.maxRank==null?rank:Math.max(g.maxRank,rank);
+    g.count=(g.count||0)+1;
+    grouped.set(key,g);
   }
-  return rows;
+  const merged=new Map();
+  for(const g of grouped.values()){
+    const key=`${norm(g._college)}|${norm(g._course)}`;
+    const out=merged.get(key)||{_college:g._college,_course:g._course,_collegeSearch:g._collegeSearch};
+    out[`opening_rank_${g.round}`]=g.minRank;
+    out[`closing_rank_${g.round}`]=g.maxRank;
+    out[`allotment_count_${g.round}`]=g.count;
+    merged.set(key,out);
+  }
+  return [...merged.values()];
 }
 
 function runMovement(){
@@ -862,7 +3539,7 @@ function runMovement(){
     rows=rows.filter(x=>collegeMatches(x,selectedCollege));
   }
   if(selectedCourse){
-    rows=rows.filter(x=>norm(x._course).includes(selectedCourse));
+    rows=rows.filter(x=>norm(x._course)===selectedCourse);
   }
 
   // Merge exact cleaned college+course pairs from multiple movement rows.
