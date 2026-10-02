@@ -3,132 +3,185 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SeatMentor — Counselling Intelligence</title>
-<meta name="description" content="Search counselling seats, allotments and round-wise insights.">
+<title>SeatMentor — PG Counselling Intelligence</title>
+<meta name="description" content="Explore historical PG counselling allotments and rank ranges across AIQ and state counselling.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="nav">
-  <a class="logo" href="#top">Seat<span>Mentor</span></a>
-  <nav><a class="active" href="#explore">Explore</a><a href="#rank-strategy">My Rank</a><a href="#insights">Insights</a><a href="#about">About</a></nav>
-  <div class="nav-meta"><i></i> 2025 counselling data</div>
+<header class="topbar">
+  <a class="brand" href="#top"><span>Seat</span>Mentor</a>
+  <nav>
+    <a href="#rank">My Rank</a>
+    <a href="#explore">Explore</a>
+    <a href="#movement">Movement</a>
+  </nav>
+  <div class="live"><i></i> 2025 data</div>
 </header>
 
 <main id="top">
 <section class="hero">
-  <div class="hero-inner">
-    <div class="hero-copy">
-      <div class="eyebrow">PG COUNSELLING INTELLIGENCE</div>
-      <h1>Your counselling data.<br><em>Made simple.</em></h1>
-      <p>Search colleges, specialties, seat availability and allotment trends from one clean workspace.</p>
-    </div>
-
-    <div class="selector">
-      <div class="selector-head">
-        <div><span class="num">01</span><strong>Choose your counselling</strong></div>
-        <span>Data scope</span>
-      </div>
-      <div class="selector-grid">
-        <label><small>COUNSELLING</small><select id="globalCounselling"><option value="AIQ">All India Quota</option><option value="BIHAR">Bihar PGMAC</option></select></label>
-        <label><small>YEAR</small><select id="globalYear"><option value="2025">2025</option></select></label>
-        <label class="round-field"><small>ROUND</small><select id="globalRound"><option value="1">Round 1</option></select></label>
-        <button id="applySelection">Explore data <b>→</b></button>
-      </div>
-      <div id="selectionNote"><span class="ok">●</span> Select a counselling and round to load the relevant data.</div>
-    </div>
+  <div class="hero-copy">
+    <div class="eyebrow">PG COUNSELLING INTELLIGENCE</div>
+    <h1>Know what your rank<br><em>has historically reached.</em></h1>
+    <p>Explore round-wise allotments across AIQ and state counselling. Enter an AIR, choose a round, and see the colleges and courses that were historically within range.</p>
+  </div>
+  <div class="hero-card">
+    <div class="hero-card-label">START HERE</div>
+    <div class="hero-card-title">Your AIR</div>
+    <div class="hero-mini">Compare your rank with observed closing ranks from the selected round.</div>
+    <a href="#rank" class="primary small">Check my rank <b>→</b></a>
   </div>
 </section>
 
-<section class="dashboard section" id="explore">
-  <div class="section-title">
-    <div><small>SELECTED DATASET</small><h2>Round 1 <span>·</span> 2025</h2></div>
-    <div id="status" class="loaded">Loading…</div>
-  </div>
-  <div class="kpis">
-    <article><div class="kpi-icon">▦</div><span>SEATS</span><strong id="totalSeats">—</strong><small>in selected matrix</small></article>
-    <article><div class="kpi-icon">⌂</div><span>INSTITUTES</span><strong id="aiqInstitutes">—</strong><small>unique institutions</small></article>
-    <article><div class="kpi-icon">◈</div><span>PROGRAMS</span><strong id="aiqPrograms">—</strong><small>specialties / courses</small></article>
-    <article><div class="kpi-icon">↗</div><span>ALLOTMENTS</span><strong id="allotmentCount">—</strong><small>result records</small></article>
-  </div>
-
-  <div class="search-zone">
-    <div class="search-title"><div><small>FIND WHAT YOU NEED</small><h2>Search seats</h2></div><p>Filter first. View details only when you need them.</p></div>
-    <div id="matrixExplorer" hidden>
-      <div class="search-box">
-        <div class="search-main"><span>⌕</span><label><small>COLLEGE / HOSPITAL</small><input id="matrixInstitute" placeholder="Start typing a college name"></label></div>
-        <label><small>SPECIALTY</small><input id="matrixProgram" placeholder="e.g. General Medicine"></label>
-        <label><small>QUOTA</small><select id="matrixQuota"><option value="">All quotas</option></select></label>
-        <button id="matrixSearch">Search</button>
-      </div>
-      <div class="quick"><span>Popular searches</span><button data-q="GENERAL MEDICINE">General Medicine</button><button data-q="PAEDIATRICS">Paediatrics</button><button data-q="RADIO">Radiology</button><button data-q="ORTHO">Orthopaedics</button></div>
-      <div class="result-bar"><b>Seat matrix</b><span>Matching records</span></div>
-      <div class="table-card"><table><thead><tr><th>Institute</th><th>Program</th><th>Quota</th><th>Open</th><th>EWS</th><th>OBC</th><th>SC</th><th>ST</th><th>Total</th></tr></thead><tbody id="matrixBody"></tbody></table></div>
+<section class="rank section" id="rank">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">01 · MY RANK</div>
+      <h2>What can my rank reach?</h2>
     </div>
-    <div id="matrixPrompt" class="prompt"><div>⌕</div><b>Choose your counselling above</b><span>Then search by college, specialty or quota.</span></div>
+    <span class="data-badge" id="rankDataStatus">Preparing data…</span>
   </div>
 
-  <div class="allot-zone">
-    <div class="search-title"><div><small>ALLOTMENT RESULTS</small><h2>Find allotments</h2></div><p>Search by AIR, college or specialty.</p></div>
-    <div id="allotmentExplorer" hidden>
-      <div class="search-box allot-box">
-        <label><small>COLLEGE / HOSPITAL</small><input id="allotInstitute" placeholder="Search college"></label>
-        <label><small>SPECIALTY / BRANCH</small><input id="allotBranch" placeholder="Search branch"></label>
-        <label><small>CATEGORY</small><select id="allotCategory"><option value="">All categories</option></select></label>
-        <label><small>MAX AIR</small><input id="allotAir" type="number" placeholder="e.g. 10000"></label>
-        <button id="allotSearch">Search</button>
-      </div>
-      <div class="result-bar"><b>Allotment results</b><span>Maximum 250 records</span></div>
-      <div class="table-card"><table><thead><tr><th>AIR</th><th>Institute</th><th>Branch</th><th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th></tr></thead><tbody id="allotmentBody"></tbody></table></div>
+  <div class="control-card">
+    <div class="control-grid">
+      <label class="wide">
+        <span>Your NEET AIR</span>
+        <input id="myRank" type="number" min="1" placeholder="e.g. 5000">
+      </label>
+      <label>
+        <span>Counselling</span>
+        <select id="counselling">
+          <option value="AIQ">All India Quota</option>
+          <option value="BIHAR">Bihar PGMAC</option>
+          <option value="UP">Uttar Pradesh</option>
+          <option value="MP">Madhya Pradesh</option>
+          <option value="RAJASTHAN">Rajasthan</option>
+          <option value="JHARKHAND">Jharkhand</option>
+        </select>
+      </label>
+      <label>
+        <span>Round</span>
+        <select id="round"></select>
+      </label>
+      <label>
+        <span>Specialty <em>optional</em></span>
+        <input id="rankCourse" placeholder="e.g. General Medicine">
+      </label>
+      <label>
+        <span>College <em>optional</em></span>
+        <input id="rankCollege" placeholder="e.g. AIIMS">
+      </label>
+      <button id="rankSearch" class="primary">Find my historical range <b>→</b></button>
     </div>
-    <div id="allotmentPrompt" class="prompt compact"><div>↗</div><b>Allotment explorer</b><span>Select a counselling and round to activate it.</span></div>
+    <div class="rule">
+      <b>How this works</b>
+      <span>We compare your AIR with the observed closing AIR in the selected counselling and round. This is historical data, not a guaranteed future allotment.</span>
+    </div>
   </div>
-</section>
 
-<section class="rank-strategy section" id="rank-strategy">
-  <div class="section-title">
-    <div><small>MY RANK</small><h2>What should I consider?</h2></div>
-    <p>Use historical allotments to see which choices were reachable at your AIR.</p>
+  <div id="rankEmpty" class="empty-state">
+    <div class="empty-icon">5000</div>
+    <h3>Enter your AIR to begin</h3>
+    <p>Try <b>5000</b> with AIQ and Round 1.</p>
   </div>
-  <div class="rank-card">
-    <div class="rank-card-head">
+
+  <div id="rankResults" hidden>
+    <div class="result-head">
       <div>
-        <span class="rank-badge">🎯</span>
-        <div><h3>Don't miss a historically reachable choice</h3><p>This is a data signal, not a guaranteed allotment.</p></div>
+        <div class="eyebrow">HISTORICAL REACH</div>
+        <h3 id="rankResultTitle">—</h3>
       </div>
-      <div class="rank-source" id="rankSource">Waiting for allotment data</div>
+      <div class="result-count" id="rankResultCount">—</div>
     </div>
-    <div class="rank-inputs">
-      <label><small>YOUR NEET AIR</small><input id="myRank" type="number" min="1" placeholder="e.g. 5000"></label>
-      <label><small>BRANCH / SPECIALTY <span>OPTIONAL</span></small><input id="rankBranch" placeholder="e.g. General Medicine"></label>
-      <label><small>CANDIDATE CATEGORY <span>OPTIONAL</span></small><select id="rankCategory"><option value="">All candidate categories</option></select></label>
-      <label><small>COLLEGE <span>OPTIONAL</span></small><input id="rankInstitute" placeholder="e.g. I.G.I.M.S."></label>
-      <button id="rankSearch">Check my rank <b>→</b></button>
+    <div class="rank-grid" id="rankGrid"></div>
+  </div>
+</section>
+
+<section class="section explore" id="explore">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">02 · EXPLORE</div>
+      <h2>Search the selected round</h2>
     </div>
-    <div class="rank-note"><b>How it works:</b> we compare your AIR with the highest AIR observed for matching institute + branch allotments in the selected dataset. A positive buffer means your AIR is better than that observed last AIR.</div>
-    <div id="rankEmpty" class="rank-empty"><div>5000</div><b>Enter your AIR to see your historical reach</b><span>Try your rank with a specialty or college filter.</span></div>
-    <div id="rankResults" hidden>
-      <div class="rank-summary" id="rankSummary"></div>
-      <div class="rank-result-list" id="rankResultList"></div>
+    <span class="data-badge" id="exploreStatus">Select a dataset</span>
+  </div>
+
+  <div class="explore-card">
+    <div class="explore-controls">
+      <label>
+        <span>College / Institute</span>
+        <input id="searchCollege" placeholder="Start typing a college">
+      </label>
+      <label>
+        <span>Specialty / Course</span>
+        <input id="searchCourse" placeholder="e.g. MD Medicine">
+      </label>
+      <label>
+        <span>Maximum AIR</span>
+        <input id="searchMaxAir" type="number" placeholder="e.g. 10000">
+      </label>
+      <button id="exploreSearch" class="secondary">Search</button>
+    </div>
+    <div class="chips">
+      <span>Quick search</span>
+      <button data-course="GENERAL MEDICINE">General Medicine</button>
+      <button data-course="PAEDIATRICS">Paediatrics</button>
+      <button data-course="RADIOLOGY">Radiology</button>
+      <button data-course="ORTHOPAEDICS">Orthopaedics</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-head">
+      <b id="exploreTitle">Allotment results</b>
+      <span id="exploreMeta">Search to view records</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>AIR</th><th>College / Institute</th><th>Course</th><th>Category</th><th>Quota</th><th>Seat type</th></tr>
+        </thead>
+        <tbody id="exploreBody"></tbody>
+      </table>
     </div>
   </div>
 </section>
 
-<section class="section insights" id="insights">
-  <div class="section-title"><div><small>DATA-DRIVEN VIEW</small><h2>Useful insights</h2></div><p>Starting with the current round. More comparisons will appear as rounds are added.</p></div>
-  <div class="insight-grid">
-    <article><span>01</span><small>LARGEST PROGRAM</small><strong id="topProgram">—</strong><p>Highest seat count in the selected matrix.</p></article>
-    <article><span>02</span><small>LARGEST INSTITUTE</small><strong id="topInstitute">—</strong><p>Highest total seats in the selected matrix.</p></article>
-    <article><span>03</span><small>LOWEST OBSERVED AIR</small><strong id="bestObserved">—</strong><p>Lowest AIR present in the loaded allotment data.</p></article>
+<section class="section movement" id="movement">
+  <div class="section-head">
+    <div>
+      <div class="eyebrow">03 · ROUND MOVEMENT</div>
+      <h2>How did the historical range move?</h2>
+    </div>
+    <span class="data-badge">Round-wise</span>
   </div>
-  <div class="roadmap"><b>Coming next</b><span>Round comparison</span><i>→</i><span>Opening & closing AIR</span><i>→</i><span>College comparison</span><i>→</i><span>State counselling</span></div>
+
+  <div class="movement-card">
+    <div class="movement-controls">
+      <label><span>College / Institute</span><input id="moveCollege" placeholder="e.g. AIIMS"></label>
+      <label><span>Course</span><input id="moveCourse" placeholder="e.g. General Medicine"></label>
+      <button id="moveSearch" class="secondary">Show movement</button>
+    </div>
+    <div id="movementEmpty" class="movement-empty">Enter a college or course to compare observed opening and closing AIR across rounds.</div>
+    <div id="movementResults" hidden>
+      <div class="movement-title" id="movementTitle">—</div>
+      <div class="movement-row" id="movementRow"></div>
+    </div>
+  </div>
 </section>
 
-<section class="about" id="about">
-  <div><small>SEATMENTOR</small><h2>From scattered counselling data to one clear view.</h2></div>
-  <p>SeatMentor turns counselling datasets into searchable tables and decision-support insights. The same framework can accommodate additional rounds, AIQ data and state counselling datasets as they are added.</p>
+<section class="section note-section">
+  <div class="note">
+    <div class="note-icon">i</div>
+    <div>
+      <b>Read the numbers correctly</b>
+      <p>“Historically reachable” means your AIR is better than or equal to an observed closing AIR for the selected dataset. It does not guarantee an allotment because choice order, eligibility, category, quota, vacancies and counselling rules also affect allocation.</p>
+    </div>
+  </div>
 </section>
 </main>
-<footer>SeatMentor · Counselling intelligence</footer>
+
+<footer>SeatMentor · 2025 counselling intelligence · Historical data explorer</footer>
 <script src="script.js"></script>
 </body>
 </html>

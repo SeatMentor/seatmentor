@@ -1,35 +1,187 @@
-let matrixData=[],allotmentData=[];
-const DATASETS={
-  AIQ:{label:"All India Quota",rounds:{1:{matrix:"data/aiq_seat_matrix_r1_2025.csv",allotments:null}}},
-  BIHAR:{label:"Bihar PGMAC",rounds:{1:{matrix:null,allotments:"data/pgmac_allotment_r1_2025.csv"}}}
+const PATHS = {
+  AIQ: {label:"All India Quota", allotment:"data/allotment/aiq.csv", cutoff:"data/cutoff/aiq.csv", movement:"data/movement/aiq.csv"},
+  BIHAR: {label:"Bihar PGMAC", allotment:"data/allotment/bihar.csv", cutoff:"data/cutoff/bihar.csv", movement:"data/movement/bihar.csv"},
+  UP: {label:"Uttar Pradesh", allotment:"data/allotment/up.csv", cutoff:"data/cutoff/up.csv", movement:"data/movement/up.csv"},
+  MP: {label:"Madhya Pradesh", allotment:"data/allotment/mp.csv", cutoff:"data/cutoff/mp.csv", movement:"data/movement/mp.csv"},
+  RAJASTHAN: {label:"Rajasthan", allotment:"data/allotment/rajasthan.csv", cutoff:"data/cutoff/rajasthan.csv", movement:"data/movement/rajasthan.csv"},
+  JHARKHAND: {label:"Jharkhand", allotment:"data/allotment/jharkhand.csv", cutoff:"data/cutoff/jharkhand.csv", movement:"data/movement/jharkhand.csv"}
 };
-const n=v=>Number(String(v??"").replace(/,/g,""))||0;
-const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const clean=v=>String(v??"").trim().toLowerCase();
-function parseCSV(t){const rows=[];let row=[],cell="",q=false;for(let i=0;i<t.length;i++){let c=t[i],nx=t[i+1];if(c==='"'){if(q&&nx==='"'){cell+='"';i++}else q=!q}else if(c===','&&!q){row.push(cell);cell=""}else if((c==='\n'||c==='\r')&&!q){if(c==='\r'&&nx==='\n')i++;row.push(cell);cell="";if(row.some(v=>v!==""))rows.push(row);row=[]}else cell+=c}if(cell!==""||row.length){row.push(cell);if(row.some(v=>v!==""))rows.push(row)}const h=(rows.shift()||[]).map(x=>x.trim());return rows.map(r=>Object.fromEntries(h.map((x,i)=>[x,(r[i]??"").trim()])))}
-async function fetchCSV(path){if(!path)return[];const r=await fetch(path);if(!r.ok)throw Error(path);return parseCSV(await r.text())}
-function currentConfig(){const key=document.getElementById("globalCounselling").value,round=document.getElementById("globalRound").value;return {key,round,cfg:DATASETS[key],data:DATASETS[key].rounds[round]}}
-function populateRounds(){const key=document.getElementById("globalCounselling").value,cfg=DATASETS[key];const sel=document.getElementById("globalRound");const rounds=Object.keys(cfg.rounds).sort((a,b)=>Number(a)-Number(b));sel.innerHTML=rounds.map(r=>`<option value="${r}">Round ${r}</option>`).join("");}
-async function applySelection(){const {key,round,cfg,data}=currentConfig();try{[matrixData,allotmentData]=await Promise.all([fetchCSV(data.matrix),fetchCSV(data.allotments)]);const label=`${cfg.label} · 2025 · Round ${round}`;document.getElementById("status").textContent=`${label} loaded`;document.getElementById("selectionNote").innerHTML=`<span class="ok">●</span> <b>${cfg.label}</b> · 2025 · <b>Round ${round}</b> selected. Search below to explore.`;document.getElementById("matrixExplorer").hidden=!data.matrix;document.getElementById("matrixPrompt").hidden=!!data.matrix;document.getElementById("allotmentExplorer").hidden=!data.allotments;document.getElementById("allotmentPrompt").hidden=!!data.allotments;document.querySelector(".section-title h2").innerHTML=`Round ${esc(round)} <span>·</span> 2025`;updateStats();populateFilters();clearFilters();renderMatrix(true);renderAllotments(true);renderInsights();resetRankStrategy();}
-catch(e){console.error(e);document.getElementById("status").textContent="Data could not be loaded";document.getElementById("selectionNote").innerHTML='<span style="color:#d14343">●</span> Could not load this dataset. Check that the CSV file exists in the data folder.';resetRankStrategy();}}
-function updateStats(){document.getElementById("totalSeats").textContent=matrixData.length?matrixData.reduce((s,r)=>s+n(r.total_seats),0).toLocaleString("en-IN"):"—";document.getElementById("aiqInstitutes").textContent=matrixData.length?new Set(matrixData.map(r=>r.institute)).size.toLocaleString("en-IN"):"—";document.getElementById("aiqPrograms").textContent=matrixData.length?new Set(matrixData.map(r=>r.program)).size.toLocaleString("en-IN"):"—";document.getElementById("allotmentCount").textContent=allotmentData.length?allotmentData.length.toLocaleString("en-IN"):"—"}
-function populateFilters(){document.getElementById("matrixQuota").innerHTML='<option value="">All quotas</option>'+[...new Set(matrixData.map(r=>r.quota).filter(Boolean))].sort().map(x=>`<option>${esc(x)}</option>`).join("");document.getElementById("allotCategory").innerHTML='<option value="">All categories</option>'+[...new Set(allotmentData.map(r=>r.allotted_category).filter(Boolean))].sort().map(x=>`<option>${esc(x)}</option>`).join("");document.getElementById("rankCategory").innerHTML='<option value="">All candidate categories</option>'+[...new Set(allotmentData.map(r=>r.neet_cat).filter(Boolean))].sort().map(x=>`<option>${esc(x)}</option>`).join("")}
-function clearFilters(){["matrixInstitute","matrixProgram","allotInstitute","allotBranch","allotAir","myRank","rankBranch","rankInstitute"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""});["matrixQuota","allotCategory","rankCategory"].forEach(id=>{const el=document.getElementById(id);if(el)el.value=""})}
-function renderMatrix(initial=false){if(!matrixData.length)return;const i=clean(document.getElementById("matrixInstitute").value),p=clean(document.getElementById("matrixProgram").value),q=document.getElementById("matrixQuota").value;if(initial||(!i&&!p&&!q)){document.getElementById("matrixBody").innerHTML='<tr><td colspan="9" style="text-align:center;padding:25px;color:#7b8798">Enter a college, specialty or quota to view matching seats.</td></tr>';return}const rows=matrixData.filter(r=>(!i||clean(r.institute).includes(i))&&(!p||clean(r.program).includes(p))&&(!q||r.quota===q)).slice(0,250);document.getElementById("matrixBody").innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(r.institute)}</td><td>${esc(r.program)}</td><td>${esc(r.quota)}</td><td>${n(r.open)}</td><td>${n(r.gen_ews)}</td><td>${n(r.obc)}</td><td>${n(r.sc)}</td><td>${n(r.st)}</td><td><b>${n(r.total_seats)}</b></td></tr>`).join(""):'<tr><td colspan="9" style="text-align:center;padding:25px;color:#7b8798">No matching records.</td></tr>'}
-function renderAllotments(initial=false){if(!allotmentData.length)return;const i=clean(document.getElementById("allotInstitute").value),b=clean(document.getElementById("allotBranch").value),c=document.getElementById("allotCategory").value,m=n(document.getElementById("allotAir").value);if(initial||(!i&&!b&&!c&&!m)){document.getElementById("allotmentBody").innerHTML='<tr><td colspan="7" style="text-align:center;padding:25px;color:#7b8798">Enter a college, specialty, category or AIR to view results.</td></tr>';return}const rows=allotmentData.filter(r=>(!i||clean(r.institute).includes(i))&&(!b||clean(r.branch).includes(b))&&(!c||r.allotted_category===c)&&(!m||n(r.neet_air)<=m)).sort((a,b)=>n(a.neet_air)-n(b.neet_air)).slice(0,250);document.getElementById("allotmentBody").innerHTML=rows.length?rows.map(r=>`<tr><td><b>${esc(r.neet_air)}</b></td><td>${esc(r.institute)}</td><td>${esc(r.branch)}</td><td>${esc(r.neet_cat||r.category)}</td><td>${esc(r.allotted_category)}</td><td>${esc(r.seat_type)}</td><td>${esc(r.remarks)}</td></tr>`).join(""):'<tr><td colspan="7" style="text-align:center;padding:25px;color:#7b8798">No matching records.</td></tr>'}
-function resetRankStrategy(){const has=allotmentData.length>0;document.getElementById("rankSource").textContent=has?`${allotmentData.length.toLocaleString("en-IN")} allotments loaded`:"Allotment history not loaded for this dataset";document.getElementById("rankEmpty").hidden=false;document.getElementById("rankResults").hidden=true;document.getElementById("rankSummary").innerHTML="";document.getElementById("rankResultList").innerHTML=""}
-function rankLabel(row,rank){const gap=row.maxAir-rank;if(gap>=0)return {cls:"reachable",label:"Historically reachable",gap};return {cls:"outside",label:"Outside observed range",gap}}
-function runRankStrategy(){const rank=n(document.getElementById("myRank").value),branch=clean(document.getElementById("rankBranch").value),inst=clean(document.getElementById("rankInstitute").value),cat=document.getElementById("rankCategory").value;if(!rank||rank<1){document.getElementById("rankEmpty").hidden=false;document.getElementById("rankResults").hidden=true;return}if(!allotmentData.length){document.getElementById("rankEmpty").hidden=false;document.getElementById("rankEmpty").innerHTML='<div>!</div><b>No allotment history is loaded for this counselling</b><span>Add the round-wise allotment result to unlock My Rank.</span>';return}let rows=allotmentData.filter(r=>n(r.neet_air)>0&&(!branch||clean(r.branch).includes(branch))&&(!inst||clean(r.institute).includes(inst))&&(!cat||r.neet_cat===cat));const groups=new Map();rows.forEach(r=>{const key=`${r.institute}|||${r.branch}`;if(!groups.has(key))groups.set(key,{institute:r.institute,branch:r.branch,airs:[],count:0,categories:new Set()});const g=groups.get(key);g.airs.push(n(r.neet_air));g.count++;if(r.neet_cat)g.categories.add(r.neet_cat)});let result=[...groups.values()].map(g=>{g.minAir=Math.min(...g.airs);g.maxAir=Math.max(...g.airs);g.rankCount=g.airs.length;const gap=g.maxAir-rank;return {...g,gap,reachable:gap>=0}}).filter(g=>g.reachable).sort((a,b)=>b.gap-a.gap||a.maxAir-b.maxAir).slice(0,20);const totalReachable=[...groups.values()].filter(g=>g.maxAir>=rank).length;const rankSummary=document.getElementById("rankSummary");rankSummary.innerHTML=`<div><strong>${totalReachable}</strong><span>matching college + branch groups were historically reachable at AIR ${rank.toLocaleString("en-IN")}</span></div><small>${branch||inst||cat?"Filters applied · ":""}Showing up to 20 with the largest historical rank buffer.</small>`;document.getElementById("rankResultList").innerHTML=result.length?result.map((r,idx)=>{const l=rankLabel(r,rank);return `<article class="rank-result"><div class="rank-rank">${String(idx+1).padStart(2,"0")}</div><div class="rank-main"><strong>${esc(r.branch)}</strong><span>${esc(r.institute)}</span><div class="rank-tags"><em class="${l.cls}">${l.label}</em><em>${r.rankCount} observed allotment${r.rankCount===1?"":"s"}</em></div></div><div class="rank-metrics"><div><small>Your AIR</small><b>${rank.toLocaleString("en-IN")}</b></div><div><small>Observed last AIR</small><b>${r.maxAir.toLocaleString("en-IN")}</b></div><div class="buffer"><small>Buffer</small><b>+${r.gap.toLocaleString("en-IN")}</b></div></div></article>`}).join(""):'<div class="rank-empty"><div>—</div><b>No historically reachable match found</b><span>Try removing a filter or check a different counselling/round.</span></div>';document.getElementById("rankEmpty").hidden=true;document.getElementById("rankResults").hidden=false}
-function renderInsights(){const p={},i={};matrixData.forEach(r=>{p[r.program]=(p[r.program]||0)+n(r.total_seats);i[r.institute]=(i[r.institute]||0)+n(r.total_seats)});const tp=Object.entries(p).sort((a,b)=>b[1]-a[1])[0],ti=Object.entries(i).sort((a,b)=>b[1]-a[1])[0],air=allotmentData.filter(r=>n(r.neet_air)>0).sort((a,b)=>n(a.neet_air)-n(b.neet_air))[0];document.getElementById("topProgram").textContent=tp?`${tp[0]} — ${tp[1].toLocaleString("en-IN")} seats`:"—";document.getElementById("topInstitute").textContent=ti?`${ti[0]} — ${ti[1].toLocaleString("en-IN")} seats`:"—";document.getElementById("bestObserved").textContent=air?`AIR ${n(air.neet_air).toLocaleString("en-IN")}`:"—"}
 
-document.getElementById("globalCounselling").addEventListener("change",()=>{populateRounds();applySelection()});
-document.getElementById("globalRound").addEventListener("change",applySelection);
-document.getElementById("applySelection").addEventListener("click",applySelection);
-document.getElementById("matrixSearch").addEventListener("click",()=>renderMatrix());
-document.getElementById("allotSearch").addEventListener("click",()=>renderAllotments());
-document.getElementById("rankSearch").addEventListener("click",runRankStrategy);
-document.querySelectorAll(".quick button").forEach(b=>b.addEventListener("click",()=>{document.getElementById("matrixProgram").value=b.dataset.q;renderMatrix()}));
-["matrixInstitute","matrixProgram"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")renderMatrix()}));
-["allotInstitute","allotBranch","allotAir"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")renderAllotments()}));
-["myRank","rankBranch","rankInstitute"].forEach(id=>document.getElementById(id).addEventListener("keydown",e=>{if(e.key==="Enter")runRankStrategy()}));
-populateRounds();applySelection();
+const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], loaded:false };
+
+function parseCSV(text){
+  const rows=[]; let row=[], cell="", quoted=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i], n=text[i+1];
+    if(c==='"'){
+      if(quoted && n==='"'){cell+='"'; i++} else quoted=!quoted;
+    } else if(c===',' && !quoted){row.push(cell);cell=""}
+    else if((c==='\n'||c==='\r') && !quoted){
+      if(c==='\r'&&n==='\n')i++;
+      row.push(cell);cell="";
+      if(row.some(x=>x!=="")) rows.push(row);
+      row=[];
+    } else cell+=c;
+  }
+  if(cell!==""||row.length){row.push(cell);rows.push(row)}
+  if(!rows.length)return [];
+  const headers=rows[0].map(x=>x.trim());
+  return rows.slice(1).map(r=>{
+    const o={}; headers.forEach((h,i)=>o[h]=(r[i]??"").trim()); return o;
+  });
+}
+
+async function loadCSV(url){
+  const res=await fetch(url,{cache:"no-store"});
+  if(!res.ok) throw new Error(`${res.status} ${url}`);
+  return parseCSV(await res.text());
+}
+
+function fmt(n){ return Number(n||0).toLocaleString("en-IN"); }
+function norm(s){ return String(s||"").toUpperCase().replace(/[^A-Z0-9]+/g," ").trim(); }
+function roundLabel(r){ return r==="STRAY"?"Stray Round":`Round ${String(r).replace("R","")}`; }
+function selectedRounds(rows){
+  return [...new Set(rows.map(x=>x.round).filter(Boolean))].sort((a,b)=>{
+    const order={R1:1,R2:2,R3:3,STRAY:4}; return (order[a]||9)-(order[b]||9);
+  });
+}
+
+function setRoundOptions(rows){
+  const sel=document.getElementById("round");
+  const rounds=selectedRounds(rows);
+  sel.innerHTML=rounds.map(r=>`<option value="${r}">${roundLabel(r)}</option>`).join("");
+  if(rounds.includes(state.round)) sel.value=state.round; else {state.round=rounds[0]||"R1";sel.value=state.round;}
+}
+
+async function loadDataset(){
+  const p=PATHS[state.counselling];
+  state.loaded=false;
+  document.getElementById("rankDataStatus").textContent="Loading…";
+  document.getElementById("exploreStatus").textContent="Loading…";
+  try{
+    const [a,c,m]=await Promise.all([loadCSV(p.allotment),loadCSV(p.cutoff),loadCSV(p.movement)]);
+    state.allotments=a; state.cutoffs=c; state.movement=m; state.loaded=true;
+    setRoundOptions(a);
+    document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
+    document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
+    document.getElementById("rankEmpty").hidden=false;
+    document.getElementById("rankResults").hidden=true;
+    clearExplore();
+  }catch(e){
+    console.error(e);
+    document.getElementById("rankDataStatus").textContent="Data load error";
+    document.getElementById("exploreStatus").textContent="Check data path";
+  }
+}
+
+function currentAllotments(){
+  return state.allotments.filter(x=>x.round===state.round);
+}
+function currentCutoffs(){
+  return state.cutoffs.filter(x=>x.round===state.round);
+}
+
+function runRank(){
+  const air=Number(document.getElementById("myRank").value);
+  if(!air || air<1){document.getElementById("myRank").focus();return}
+  const course=norm(document.getElementById("rankCourse").value);
+  const college=norm(document.getElementById("rankCollege").value);
+  let rows=currentCutoffs().filter(x=>Number(x.closing_rank)>=air);
+  if(course) rows=rows.filter(x=>norm(x.course).includes(course));
+  if(college) rows=rows.filter(x=>norm(x.college).includes(college));
+  rows.sort((a,b)=>Number(a.closing_rank)-Number(b.closing_rank));
+  const unique=[]; const seen=new Set();
+  for(const x of rows){
+    const key=`${x.college}|${x.course}`;
+    if(seen.has(key))continue;
+    seen.add(key); unique.push(x);
+    if(unique.length>=60)break;
+  }
+  document.getElementById("rankEmpty").hidden=true;
+  document.getElementById("rankResults").hidden=false;
+  document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
+  document.getElementById("rankResultCount").textContent=`${fmt(unique.length)} historical matches`;
+  const grid=document.getElementById("rankGrid");
+  if(!unique.length){
+    grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty or college filter, or choose another round.</p></div>`;
+    return;
+  }
+  grid.innerHTML=unique.map(x=>{
+    const close=Number(x.closing_rank), buffer=close-air;
+    return `<article class="rank-item">
+      <span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span>
+      <h4>${esc(x.course||"Course not available")}</h4>
+      <p>${esc(x.college||"Institute not available")}</p>
+      <div class="rank-metrics">
+        <div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div>
+        <div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div>
+        <div class="metric"><small>Historical buffer</small><strong class="buffer">${buffer>=0?"+":""}${fmt(buffer)}</strong></div>
+        <div class="metric"><small>Allotments</small><strong>${fmt(x.allotment_count)}</strong></div>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function runExplore(){
+  const college=norm(document.getElementById("searchCollege").value);
+  const course=norm(document.getElementById("searchCourse").value);
+  const maxAir=Number(document.getElementById("searchMaxAir").value)||Infinity;
+  let rows=currentAllotments().filter(x=>Number(x.rank_value)<=maxAir);
+  if(college) rows=rows.filter(x=>norm(x.college).includes(college));
+  if(course) rows=rows.filter(x=>norm(x.course).includes(course));
+  rows.sort((a,b)=>Number(a.rank_value)-Number(b.rank_value));
+  rows=rows.slice(0,250);
+  document.getElementById("exploreMeta").textContent=`${fmt(rows.length)} records shown · max 250`;
+  document.getElementById("exploreBody").innerHTML=rows.length?rows.map(x=>`<tr>
+    <td>${fmt(x.rank_value)}</td><td>${esc(x.college)}</td><td>${esc(x.course)}</td>
+    <td>${esc(x.category)}</td><td>${esc(x.quota)}</td><td>${esc(x.seat_type)}</td>
+  </tr>`).join(""):`<tr><td colspan="6">No records found for the selected filters.</td></tr>`;
+}
+function clearExplore(){
+  document.getElementById("exploreMeta").textContent="Search to view records";
+  document.getElementById("exploreBody").innerHTML=`<tr><td colspan="6">Enter a college, specialty or AIR limit and search.</td></tr>`;
+}
+
+function runMovement(){
+  const college=norm(document.getElementById("moveCollege").value);
+  const course=norm(document.getElementById("moveCourse").value);
+  let rows=state.movement.filter(x=>(!college||norm(x.college).includes(college))&&(!course||norm(x.course).includes(course)));
+  if(!rows.length){
+    document.getElementById("movementResults").hidden=true;
+    document.getElementById("movementEmpty").textContent="No matching historical movement found. Try a broader college or course name.";
+    return;
+  }
+  const x=rows[0];
+  document.getElementById("movementEmpty").hidden=true;
+  document.getElementById("movementResults").hidden=false;
+  document.getElementById("movementTitle").textContent=`${x.college} · ${x.course}`;
+  const rounds=[["R1","Round 1"],["R2","Round 2"],["R3","Round 3"],["STRAY","Stray"]];
+  document.getElementById("movementRow").innerHTML=rounds.map(([r,label])=>{
+    const o=x[`opening_rank_${r}`], c=x[`closing_rank_${r}`];
+    return `<div class="move-box"><small>${label}</small><strong>${o&&c?`${fmt(o)} – ${fmt(c)}`:"—"}</strong><span>${x[`allotment_count_${r}`]?fmt(x[`allotment_count_${r}`])+" allotments":"No observed data"}</span></div>`;
+  }).join("");
+}
+
+function esc(s){
+  return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+document.getElementById("counselling").addEventListener("change",async e=>{
+  state.counselling=e.target.value; state.round="R1"; await loadDataset();
+});
+document.getElementById("round").addEventListener("change",e=>{
+  state.round=e.target.value;
+  document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
+  clearExplore();
+});
+document.getElementById("rankSearch").addEventListener("click",runRank);
+document.getElementById("exploreSearch").addEventListener("click",runExplore);
+document.getElementById("moveSearch").addEventListener("click",runMovement);
+document.querySelectorAll(".chips button").forEach(b=>b.addEventListener("click",()=>{
+  document.getElementById("searchCourse").value=b.dataset.course; runExplore();
+}));
+document.getElementById("myRank").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
+document.getElementById("rankCourse").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
+document.getElementById("rankCollege").addEventListener("keydown",e=>{if(e.key==="Enter")runRank()});
+
+loadDataset();
