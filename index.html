@@ -10,7 +10,7 @@
 <body>
 <header class="nav">
   <a class="logo" href="#top">Seat<span>Mentor</span></a>
-  <nav><a class="active" href="#explore">Explore</a><a href="#insights">Insights</a><a href="#about">About</a></nav>
+  <nav><a class="active" href="#explore">Explore</a><a href="#rank-strategy">My Rank</a><a href="#insights">Insights</a><a href="#about">About</a></nav>
   <div class="nav-meta"><i></i> 2025 counselling data</div>
 </header>
 
@@ -81,6 +81,35 @@
       <div class="table-card"><table><thead><tr><th>AIR</th><th>Institute</th><th>Branch</th><th>Candidate Cat.</th><th>Allotted Cat.</th><th>Seat Type</th><th>Remarks</th></tr></thead><tbody id="allotmentBody"></tbody></table></div>
     </div>
     <div id="allotmentPrompt" class="prompt compact"><div>↗</div><b>Allotment explorer</b><span>Select a counselling and round to activate it.</span></div>
+  </div>
+</section>
+
+<section class="rank-strategy section" id="rank-strategy">
+  <div class="section-title">
+    <div><small>MY RANK</small><h2>What should I consider?</h2></div>
+    <p>Use historical allotments to see which choices were reachable at your AIR.</p>
+  </div>
+  <div class="rank-card">
+    <div class="rank-card-head">
+      <div>
+        <span class="rank-badge">🎯</span>
+        <div><h3>Don't miss a historically reachable choice</h3><p>This is a data signal, not a guaranteed allotment.</p></div>
+      </div>
+      <div class="rank-source" id="rankSource">Waiting for allotment data</div>
+    </div>
+    <div class="rank-inputs">
+      <label><small>YOUR NEET AIR</small><input id="myRank" type="number" min="1" placeholder="e.g. 5000"></label>
+      <label><small>BRANCH / SPECIALTY <span>OPTIONAL</span></small><input id="rankBranch" placeholder="e.g. General Medicine"></label>
+      <label><small>CANDIDATE CATEGORY <span>OPTIONAL</span></small><select id="rankCategory"><option value="">All candidate categories</option></select></label>
+      <label><small>COLLEGE <span>OPTIONAL</span></small><input id="rankInstitute" placeholder="e.g. I.G.I.M.S."></label>
+      <button id="rankSearch">Check my rank <b>→</b></button>
+    </div>
+    <div class="rank-note"><b>How it works:</b> we compare your AIR with the highest AIR observed for matching institute + branch allotments in the selected dataset. A positive buffer means your AIR is better than that observed last AIR.</div>
+    <div id="rankEmpty" class="rank-empty"><div>5000</div><b>Enter your AIR to see your historical reach</b><span>Try your rank with a specialty or college filter.</span></div>
+    <div id="rankResults" hidden>
+      <div class="rank-summary" id="rankSummary"></div>
+      <div class="rank-result-list" id="rankResultList"></div>
+    </div>
   </div>
 </section>
 
