@@ -1,3 +1,25 @@
+// ---- SeatMentor analytics (Google Analytics 4) ---------------------------
+// Set the Measurement ID once in index.html. Events are safely ignored until
+// a real G-XXXXXXXXXX ID is configured.
+function trackEvent(name, params={}){
+  try{
+    if(typeof window.gtag === "function") window.gtag("event", name, params);
+  }catch(e){ console.debug("Analytics event skipped", name, e); }
+}
+
+function analyticsContext(){
+  const val=id=>document.getElementById(id)?.value || "";
+  return {
+    counselling: val("counselling"),
+    round: val("round"),
+    college_state: val("rankState"),
+    category: val("rankCategory"),
+    institute_type: val("rankInstituteType"),
+    course: val("rankCourse"),
+    college: val("rankCollege")
+  };
+}
+
 const PATHS = {
   AIQ: {label:"All India Quota", allotment:"data/allotment/aiq.csv", cutoff:"data/cutoff/aiq.csv", movement:"data/movement/aiq.csv"},
   BIHAR: {label:"Bihar PGMAC", allotment:"data/allotment/bihar.csv", cutoff:"data/cutoff/bihar.csv", movement:"data/movement/bihar.csv"},
@@ -464,6 +486,7 @@ function runRank(){
   if(!state.loaded){return;}
   const air=Number(document.getElementById("myRank").value);
   if(!air || air<1){document.getElementById("myRank").focus();return}
+  trackEvent("rank_search", {...analyticsContext(), air: air});
   const course=norm(document.getElementById("rankCourse").value);
   const college=norm(document.getElementById("rankCollege").value);
   const category=document.getElementById("rankCategory").value;
@@ -515,6 +538,12 @@ function runRank(){
 }
 
 function runExplore(){
+  trackEvent("explore_search", {
+    counselling: state.counselling, round: state.round,
+    college: document.getElementById("searchCollege").value.trim(),
+    course: document.getElementById("searchCourse").value.trim(),
+    max_air: Number(document.getElementById("searchMaxAir").value)||0
+  });
   const college=norm(document.getElementById("searchCollege").value);
   const course=norm(document.getElementById("searchCourse").value);
   const maxAir=Number(document.getElementById("searchMaxAir").value)||Infinity;
@@ -535,6 +564,12 @@ function clearExplore(){
 }
 
 function runMovement(){
+  trackEvent("movement_search", {
+    counselling: state.counselling,
+    round: state.round,
+    college: document.getElementById("moveCollege").value.trim(),
+    course: document.getElementById("moveCourse").value.trim()
+  });
   const college=norm(document.getElementById("moveCollege").value);
   const course=norm(document.getElementById("moveCourse").value);
   let rows=state.movement.filter(x=>(!college||norm(x._college||"").includes(college))&&(!course||norm(x._course||"").includes(course)));
@@ -559,10 +594,13 @@ function esc(s){
 }
 
 document.getElementById("counselling").addEventListener("change",async e=>{
-  state.counselling=e.target.value; state.round="R1"; await loadDataset();
+  state.counselling=e.target.value; state.round="R1";
+  trackEvent("counselling_change", {counselling: state.counselling});
+  await loadDataset();
 });
 document.getElementById("round").addEventListener("change",e=>{
   state.round=e.target.value;
+  trackEvent("round_change", {counselling: state.counselling, round: state.round});
   populateRankStateOptions();
   populateRankCourseOptions();
   populateCollegeOptions();
@@ -596,6 +634,7 @@ function feedbackContext(){
 }
 
 function openFeedback(){
+  trackEvent("feedback_open", analyticsContext());
   const modal=document.getElementById("feedbackModal");
   document.getElementById("feedbackContext").textContent=feedbackContext();
   document.getElementById("feedbackStatus").textContent="";
@@ -625,6 +664,11 @@ async function submitFeedback(){
       expected:document.getElementById("feedbackExpected").value.trim(),
       email:document.getElementById("feedbackEmail").value.trim()
     };
+    trackEvent("feedback_submit", {
+      issue_type: payload.issue_type,
+      counselling: document.getElementById("counselling")?.value || "",
+      round: document.getElementById("round")?.value || ""
+    });
     if(FORM_ENDPOINT){
       const res=await fetch(FORM_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(payload)});
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
