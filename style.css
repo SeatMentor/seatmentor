@@ -10,3 +10,30 @@
 .autocomplete-option{display:block;width:100%;border:0;background:#fff;text-align:left;border-radius:10px;padding:11px 12px;font:inherit;font-size:13px;color:#24312a;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .autocomplete-option:hover,.autocomplete-option.active{background:#eef5f0}
 .autocomplete-empty{padding:12px;color:#7b857e;font-size:12px}
+
+/* v32 performance + mobile containment */
+html,body{width:100%;max-width:100%;overflow-x:hidden}
+.section,.hero,.control-card,.explore-card,.movement-card,.feedback-strip,.feedback-dialog{min-width:0;max-width:100%}
+.control-grid>*,.explore-controls>*,.movement-controls>*,.hero-copy,.hero-card{min-width:0}
+input,select,button,textarea{max-width:100%}
+.table-wrap{max-width:100%}
+@media(max-width:650px){
+  .topbar{height:62px}
+  .brand{font-size:19px}
+  .hero{padding:38px 14px 44px}
+  .hero h1{font-size:clamp(36px,11vw,52px);line-height:1.02;letter-spacing:-1.8px}
+  .hero p{font-size:15px;line-height:1.6}
+  .section{padding:34px 12px}
+  .section-head h2{font-size:25px;line-height:1.12}
+  .control-card,.explore-card,.movement-card{padding:16px;border-radius:18px}
+  .control-grid input,.control-grid select,.explore-controls input,.movement-controls input{font-size:16px}
+  .rank-grid{grid-template-columns:1fr}
+  .result-head{align-items:flex-start;flex-direction:column;gap:7px}
+  .rank-item{padding:16px}
+  .feedback-strip{padding:16px}
+  .autocomplete-menu{left:0;right:0;max-width:100%;max-height:240px}
+  .autocomplete-option{font-size:14px;padding:12px}
+  .table-wrap{overflow-x:auto}
+  .table-scroll{max-width:100%;overflow:auto}
+  .table-head{gap:8px;align-items:flex-start;flex-direction:column}
+}

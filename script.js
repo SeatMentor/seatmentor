@@ -29,7 +29,8 @@ const PATHS = {
   JHARKHAND: {label:"Jharkhand", allotment:"data/allotment/jharkhand.csv", cutoff:"data/cutoff/jharkhand.csv", movement:"data/movement/jharkhand.csv"}
 };
 
-const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], collegeMaster:[], loaded:false };
+const FAST_ROUNDS = { AIQ:["R1","R2","R3","STRAY"], UP:["R1","R2","R3","STRAY"] };
+const state = { counselling:"AIQ", round:"R1", allotments:[], cutoffs:[], movement:[], movementAllotments:null, collegeMaster:[], loaded:false, loading:false, loadedRound:null };
 
 // Optional: after creating a Formspree form, paste its endpoint here.
 // Example: https://formspree.io/f/abcdwxyz
@@ -93,7 +94,7 @@ function parseCSV(text){
 }
 
 async function loadCSV(url){
-  const res=await fetch(url,{cache:"no-store"});
+  const res=await fetch(url,{cache:"default"});
   if(!res.ok) throw new Error(`${res.status} ${url}`);
   return parseCSV(await res.text());
 }
@@ -114,34 +115,89 @@ function setRoundOptions(rows){
   if(rounds.includes(state.round)) sel.value=state.round; else {state.round=rounds[0]||"R1";sel.value=state.round;}
 }
 
-async function loadDataset(){
-  const p=PATHS[state.counselling];
-  state.loaded=false;
+function hasFastDataset(){ return !!FAST_ROUNDS[state.counselling]; }
+function fastRoundPath(round){ return `data/fast/${state.counselling.toLowerCase()}/${String(round).toUpperCase()}.csv`; }
+
+async function loadCurrentRound(){
+  const round = state.round;
+  state.loading=true;
+  const preferredPath = hasFastDataset() ? fastRoundPath(round) : PATHS[state.counselling].allotment;
+  let path = preferredPath;
   document.getElementById("rankDataStatus").textContent="Loading…";
   document.getElementById("exploreStatus").textContent="Loading…";
   try{
-    // Allotment is the core source for My Rank. Cutoff/movement are optional so
-    // one missing auxiliary CSV cannot break the whole GitHub Pages app.
-    const a = await loadCSV(p.allotment);
-    const cRes = await Promise.allSettled([loadCSV(p.cutoff)]);
-    const c = cRes[0].status === "fulfilled" ? cRes[0].value : [];
-    state.allotments=normalizeDataset(a); state.cutoffs=c.map(normalizeRecord); state.movement=[]; state.loaded=true;
-    setRoundOptions(a);
+    let a;
+    try{
+      a=await loadCSV(preferredPath);
+    }catch(preferredErr){
+      // Graceful fallback: the site must still work even when data/fast has
+      // not yet been uploaded or GitHub Pages is serving an older cache.
+      if(preferredPath !== PATHS[state.counselling].allotment){
+        console.warn("Fast round file unavailable; falling back to full allotment file", preferredPath, preferredErr);
+        path=PATHS[state.counselling].allotment;
+        a=await loadCSV(path);
+      } else {
+        throw preferredErr;
+      }
+    }
+    state.allotments=normalizeDataset(a);
+    state.loadedRound=round;
+    state.loaded=true;
     populateRankStateOptions();
     populateRankCourseOptions();
     populateCollegeOptions();
     populateCourseDatalist();
     setCategoryOptions();
     document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
-    document.getElementById("exploreStatus").textContent=`${p.label} · ${roundLabel(state.round)}`;
+    document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
     document.getElementById("rankEmpty").hidden=false;
     document.getElementById("rankResults").hidden=true;
     clearExplore();
   }catch(e){
     console.error(e);
+    state.loaded=false;
     document.getElementById("rankDataStatus").textContent="Data load error";
-    document.getElementById("exploreStatus").textContent=`Could not load ${p.allotment}`;
+    document.getElementById("exploreStatus").textContent=`Could not load ${path}`;
+  }finally{
+    state.loading=false;
   }
+}
+
+async function loadDataset(){
+  state.movementAllotments=null;
+  if(hasFastDataset()){
+    const rounds=FAST_ROUNDS[state.counselling];
+    if(!rounds.includes(state.round)) state.round=rounds[0];
+    const sel=document.getElementById("round");
+    sel.innerHTML=rounds.map(r=>`<option value="${r}">${roundLabel(r)}</option>`).join("");
+    sel.value=state.round;
+    await loadCurrentRound();
+    return;
+  }
+  await loadCurrentRound();
+}
+
+async function ensureMovementData(){
+  if(state.movementAllotments) return state.movementAllotments;
+  if(hasFastDataset()){
+    const rounds=FAST_ROUNDS[state.counselling];
+    try{
+      const parts=await Promise.all(rounds.map(r=>loadCSV(fastRoundPath(r))));
+      const raw=parts.flat();
+      if(raw.length) state.movementAllotments=normalizeDataset(raw);
+      else throw new Error("Fast movement files were empty");
+    }catch(e){
+      // Keep Round Movement functional without requiring the optional fast
+      // files. Fall back to the existing consolidated allotment source.
+      console.warn("Fast movement files unavailable; falling back to consolidated allotment file", e);
+      const raw=await loadCSV(PATHS[state.counselling].allotment);
+      state.movementAllotments=normalizeDataset(raw);
+    }
+  }else{
+    // For smaller counsellings the full current dataset is already in memory.
+    state.movementAllotments=state.allotments.slice();
+  }
+  return state.movementAllotments;
 }
 
 const COLLEGE_STATES = [
@@ -3500,7 +3556,7 @@ function clearExplore(){
 
 function buildMovementRows(){
   const grouped=new Map();
-  for(const x of state.allotments){
+  for(const x of (state.movementAllotments || state.allotments)){
     const college=x._college, course=x._course, round=String(x.round||'').toUpperCase(), rank=Number(x.rank_value);
     if(!college || !course || !/^R[123]$|^STRAY$/.test(round) || !Number.isFinite(rank) || rank<=0) continue;
     const key=`${norm(college)}|${norm(course)}|${round}`;
@@ -3523,7 +3579,7 @@ function buildMovementRows(){
   return [...merged.values()];
 }
 
-function runMovement(){
+async function runMovement(){
   trackEvent('movement_search', {
     counselling: state.counselling,
     round: state.round,
@@ -3533,7 +3589,21 @@ function runMovement(){
 
   const selectedCollege=norm(document.getElementById('moveCollege').value);
   const selectedCourse=norm(document.getElementById('moveCourse').value);
-  let rows=buildMovementRows();
+  document.getElementById('moveSearch').disabled=true;
+  document.getElementById('movementEmpty').textContent='Loading movement data…';
+  let rows=[];
+  try {
+    await ensureMovementData();
+    rows=buildMovementRows();
+  } catch(err) {
+    console.error(err);
+    document.getElementById('movementEmpty').hidden=false;
+    document.getElementById('movementResults').hidden=true;
+    document.getElementById('movementEmpty').textContent='Could not load movement data. Please try again.';
+    return;
+  } finally {
+    document.getElementById('moveSearch').disabled=false;
+  }
 
   if(selectedCollege){
     rows=rows.filter(x=>collegeMatches(x,selectedCollege));
@@ -3592,15 +3662,18 @@ document.getElementById("counselling").addEventListener("change",async e=>{
   trackEvent("counselling_change", {counselling: state.counselling});
   await loadDataset();
 });
-document.getElementById("round").addEventListener("change",e=>{
+document.getElementById("round").addEventListener("change",async e=>{
   state.round=e.target.value;
   trackEvent("round_change", {counselling: state.counselling, round: state.round});
-  populateRankStateOptions();
-  populateRankCourseOptions();
-  populateCollegeOptions();
-  populateCourseDatalist();
-  document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
-  clearExplore();
+  if(hasFastDataset()) await loadCurrentRound();
+  else {
+    populateRankStateOptions();
+    populateRankCourseOptions();
+    populateCollegeOptions();
+    populateCourseDatalist();
+    document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
+    clearExplore();
+  }
 });
 document.getElementById("rankState").addEventListener("change",()=>{});
 document.getElementById("rankCategory").addEventListener("change",()=>{});
