@@ -118,37 +118,47 @@ function setRoundOptions(rows){
 function hasFastDataset(){ return !!FAST_ROUNDS[state.counselling]; }
 function fastRoundPath(round){ return `data/fast/${state.counselling.toLowerCase()}/${String(round).toUpperCase()}.csv`; }
 
+function prepareLightDataset(rows){
+  // IMPORTANT: Do not run expensive fuzzy college matching during page load.
+  // College names are resolved lazily only for rows actually displayed/filtered.
+  return rows.map(x=>({
+    ...x,
+    _course: canonicalCourse(x.course, x.category, x.college),
+    _category: cleanRowCategory(x),
+    _college: "",
+    _collegeRaw: String(x.college||""),
+    _collegeSearch: norm(String(x.college||""))
+  }));
+}
+
 async function loadCurrentRound(){
   const round = state.round;
   state.loading=true;
   const preferredPath = hasFastDataset() ? fastRoundPath(round) : PATHS[state.counselling].allotment;
   let path = preferredPath;
-  document.getElementById("rankDataStatus").textContent="Loading…";
-  document.getElementById("exploreStatus").textContent="Loading…";
+  document.getElementById("rankDataStatus").textContent="Loading selected round…";
+  document.getElementById("exploreStatus").textContent="Loading selected round…";
   try{
     let a;
     try{
       a=await loadCSV(preferredPath);
     }catch(preferredErr){
-      // Graceful fallback: the site must still work even when data/fast has
-      // not yet been uploaded or GitHub Pages is serving an older cache.
+      // Fallback is safe now because we no longer perform O(rows × college-master)
+      // fuzzy matching during load.
       if(preferredPath !== PATHS[state.counselling].allotment){
-        console.warn("Fast round file unavailable; falling back to full allotment file", preferredPath, preferredErr);
+        console.warn("Fast round file unavailable; using consolidated allotment file", preferredPath, preferredErr);
         path=PATHS[state.counselling].allotment;
         a=await loadCSV(path);
       } else {
         throw preferredErr;
       }
     }
-    state.allotments=normalizeDataset(a);
+    state.allotments=prepareLightDataset(a);
     state.loadedRound=round;
     state.loaded=true;
-    populateRankStateOptions();
     populateRankCourseOptions();
-    populateCollegeOptions();
-    populateCourseDatalist();
     setCategoryOptions();
-    document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments`;
+    document.getElementById("rankDataStatus").textContent=`${fmt(a.length)} allotments loaded`;
     document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
     document.getElementById("rankEmpty").hidden=false;
     document.getElementById("rankResults").hidden=true;
@@ -161,43 +171,57 @@ async function loadCurrentRound(){
   }finally{
     state.loading=false;
   }
+  return state.loaded;
+}
+
+function prepareStaticRoundUI(){
+  const sel=document.getElementById("round");
+  const rounds=["R1","R2","R3","STRAY"];
+  sel.innerHTML=rounds.map(r=>`<option value="${r}">${roundLabel(r)}</option>`).join("");
+  sel.value=state.round;
+}
+
+function prepareStaticCourseUI(){
+  const sel=document.getElementById("rankCourse");
+  if(!sel) return;
+  const courses=[
+    "MD - General Medicine","MS - General Surgery","MD - Anaesthesiology","MD - Paediatrics",
+    "MS - Orthopaedics","MD - Radio Diagnosis / Radiology","MS - Obstetrics & Gynaecology",
+    "MS - Ophthalmology","MS - ENT","MD - Pathology","MD - Microbiology","MD - Pharmacology",
+    "MD - Physiology","MD - Psychiatry","MD - Community Medicine","MD - Forensic Medicine",
+    "MD - Anatomy","MD - Biochemistry","MD - Dermatology","MD - Emergency Medicine",
+    "MD - Radiotherapy","MD - Physical Medicine & Rehabilitation",
+    "Diploma - Anaesthesiology","Diploma - Paediatrics","Diploma - Ophthalmology","Diploma - ENT",
+    "Diploma - Pathology","Diploma - Radio Diagnosis","Diploma - Obstetrics & Gynaecology","Diploma - Dermatology",
+    "Diploma - Orthopaedics","Diploma - Psychiatry","Diploma - Community Medicine","Diploma - Forensic Medicine",
+    "Diploma - Microbiology","Diploma - Pharmacology"
+  ];
+  const prev=sel.value;
+  sel.innerHTML=`<option value="">All courses</option>`+courses.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  if(courses.includes(prev)) sel.value=prev;
 }
 
 async function loadDataset(){
-  state.movementAllotments=null;
-  if(hasFastDataset()){
-    const rounds=FAST_ROUNDS[state.counselling];
-    if(!rounds.includes(state.round)) state.round=rounds[0];
-    const sel=document.getElementById("round");
-    sel.innerHTML=rounds.map(r=>`<option value="${r}">${roundLabel(r)}</option>`).join("");
-    sel.value=state.round;
-    await loadCurrentRound();
-    return;
-  }
-  await loadCurrentRound();
+  // Dataset is intentionally NOT loaded on page startup.
+  // This keeps first paint instant on PC and mobile.
+  prepareStaticRoundUI();
+  prepareStaticCourseUI();
+  setCategoryOptions();
+  populateRankStateOptions();
+  populateCollegeOptions();
+  populateCourseDatalist();
+  document.getElementById("rankDataStatus").textContent="Ready — enter your AIR and search";
+  document.getElementById("exploreStatus").textContent="Select filters and search";
+  state.loaded=false;
+  return true;
 }
 
 async function ensureMovementData(){
   if(state.movementAllotments) return state.movementAllotments;
-  if(hasFastDataset()){
-    const rounds=FAST_ROUNDS[state.counselling];
-    try{
-      const parts=await Promise.all(rounds.map(r=>loadCSV(fastRoundPath(r))));
-      const raw=parts.flat();
-      if(raw.length) state.movementAllotments=normalizeDataset(raw);
-      else throw new Error("Fast movement files were empty");
-    }catch(e){
-      // Keep Round Movement functional without requiring the optional fast
-      // files. Fall back to the existing consolidated allotment source.
-      console.warn("Fast movement files unavailable; falling back to consolidated allotment file", e);
-      const raw=await loadCSV(PATHS[state.counselling].allotment);
-      state.movementAllotments=normalizeDataset(raw);
-    }
-  }else{
-    // For smaller counsellings the full current dataset is already in memory.
-    state.movementAllotments=state.allotments.slice();
-  }
-  return state.movementAllotments;
+  const url=PATHS[state.counselling].movement;
+  const raw=await loadCSV(url);
+  state.movementAllotments=raw;
+  return raw;
 }
 
 const COLLEGE_STATES = [
@@ -3371,14 +3395,34 @@ function setupCollegeAutocomplete(inputId, menuId){
   document.addEventListener("click",e=>{ if(!host.contains(e.target)) close(); });
 }
 
+const DISPLAY_COLLEGE_CACHE = new Map();
+function displayCollege(x){
+  const raw=String(x?._college||x?._collegeRaw||x?.college||"").trim();
+  if(!raw) return "";
+  if(x._college) return x._college;
+  let c=DISPLAY_COLLEGE_CACHE.get(raw);
+  if(c===undefined){
+    c=cleanCollegeName(raw);
+    DISPLAY_COLLEGE_CACHE.set(raw,c||"");
+  }
+  return c||raw.split(/\s*,\s*/)[0].trim();
+}
+function selectedCollegeMatchesRaw(raw, selected){
+  const q=norm(selected); if(!q) return true;
+  const r=norm(raw); if(!r) return false;
+  if(r.includes(q)) return true;
+  const generic=new Set(["MEDICAL","MEDICALS","COLLEGE","HOSPITAL","INSTITUTE","INSTITUTES","OF","THE","AND","CENTRE","CENTER","RESEARCH","SCIENCES","GOVERNMENT","GOVT"]);
+  const toks=q.split(' ').filter(t=>t.length>=3 && !generic.has(t));
+  if(!toks.length) return false;
+  const hits=toks.filter(t=>r.includes(t)).length;
+  return hits===toks.length || (toks.length>=2 && hits>=Math.max(2,Math.ceil(toks.length*0.7)));
+}
+
 function collegeMatches(x, query){
   if(!query) return true;
-  const q=norm(query);
-  if(!q) return true;
-  const hay=norm([x._college||'',x._collegeSearch||'',x.college||'',x._collegeAliases||''].join(' '));
-  if(hay.includes(q)) return true;
-  const tokens=q.split(' ').filter(t=>t.length>2);
-  return tokens.length>=3 && tokens.every(t=>hay.includes(t));
+  const q=String(query||'').trim(); if(!q) return true;
+  if(x._college && norm(x._college)===norm(q)) return true;
+  return selectedCollegeMatchesRaw(x._collegeRaw||x.college||'', q);
 }
 
 function looksLikeSeatMarker(value){
@@ -3460,45 +3504,48 @@ function rankFilteredAllotments(){
   const selectedCategory=document.getElementById("rankCategory").value;
   const selectedInstituteType=document.getElementById("rankInstituteType")?.value || "ALL";
   let rows=currentAllotments();
-  if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>deriveCollegeState(x)===selectedState);
+  if(selectedState && selectedState!=="ALL") rows=rows.filter(x=>deriveCollegeState({...x,_college:displayCollege(x)})===selectedState);
   if(selectedCategory && selectedCategory!=="ALL") rows=rows.filter(x=>(x._category||cleanCategory(x.category))===selectedCategory);
-  if(selectedInstituteType && selectedInstituteType!=="ALL") rows=rows.filter(x=>deriveInstituteType(x)===selectedInstituteType);
-  return rows.filter(x=>Number(x.rank_value)>0 && x.college && x.course);
+  if(selectedInstituteType && selectedInstituteType!=="ALL") rows=rows.filter(x=>deriveInstituteType({...x,_college:displayCollege(x)})===selectedInstituteType);
+  return rows.filter(x=>Number(x.rank_value)>0 && x.course);
 }
 
 function currentAllotments(){
-  return state.allotments.filter(x=>x.round===state.round);
+  return state.allotments.filter(x=>!x.round || x.round===state.round);
 }
 function currentCutoffs(){
   return state.cutoffs.filter(x=>x.round===state.round);
 }
 
-function runRank(){
-  if(!state.loaded){return;}
+async function runRank(){
+  if(!state.loaded){
+    const ok=await loadCurrentRound();
+    if(!ok) return;
+  }
   const air=Number(document.getElementById("myRank").value);
   if(!air || air<1){document.getElementById("myRank").focus();return}
   trackEvent("rank_search", {...analyticsContext(), air: air});
-  const course=norm(document.getElementById("rankCourse").value);
-  const college=norm(document.getElementById("rankCollege").value);
+  const course=document.getElementById("rankCourse").value;
+  const college=document.getElementById("rankCollege").value.trim();
   const category=document.getElementById("rankCategory").value;
   let source=rankFilteredAllotments();
-  if(course) source=source.filter(x=>x._course===document.getElementById("rankCourse").value);
+  if(course) source=source.filter(x=>x._course===course);
   if(college) source=source.filter(x=>collegeMatches(x,college));
 
-  // Derive observed closing AIR from the selected round's actual allotments.
-  // This keeps category/state filters tied to the same round instead of mixing rounds.
   const groups=new Map();
   for(const x of source){
+    const collegeName=displayCollege(x);
+    const courseName=x._course||canonicalCourse(x.course,x.category,x.college);
+    if(!collegeName || !courseName) continue;
     const cat=x._category || cleanCategory(x.category) || "OTHER";
-    const key=category==="ALL" ? `${x._college}|${x._course}|${cat}` : `${x._college}|${x._course}`;
-    const rank=Number(x.rank_value);
+    const key=category==="ALL" ? `${collegeName}|${courseName}|${cat}` : `${collegeName}|${courseName}`;
+    const rank=Number(x.rank_value); if(!Number.isFinite(rank)||rank<=0) continue;
     const prev=groups.get(key);
-    if(!prev || rank>prev.closing_rank){ groups.set(key,{...x,closing_rank:rank,category_clean:cat,allotment_count:1}); }
+    if(!prev || rank>prev.closing_rank){groups.set(key,{...x,_college:collegeName,_course:courseName,closing_rank:rank,category_clean:cat,allotment_count:1});}
     else prev.allotment_count++;
   }
   let rows=[...groups.values()].filter(x=>x.closing_rank>=air);
-  rows.sort((a,b)=>a.closing_rank-b.closing_rank);
-  rows=rows.slice(0,60);
+  rows.sort((a,b)=>a.closing_rank-b.closing_rank); rows=rows.slice(0,60);
 
   document.getElementById("rankEmpty").hidden=true;
   document.getElementById("rankResults").hidden=false;
@@ -3508,172 +3555,84 @@ function runRank(){
   document.getElementById("rankResultTitle").textContent=`AIR ${fmt(air)} · ${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
   document.getElementById("rankResultCount").textContent=`${fmt(rows.length)} historical matches · ${stateLabel} · ${categoryLabel} · ${instituteTypeLabel}`;
   const grid=document.getElementById("rankGrid");
-  if(!rows.length){
-    grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty, college, state or category filter, or choose another round.</p></div>`;
-    return;
-  }
-  grid.innerHTML=rows.map(x=>{
-    const close=Number(x.closing_rank), buffer=close-air;
-    return `<article class="rank-item">
-      <span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span>
-      <h4>${esc(x._course||"Course not available")}</h4>
-      <p>${esc(x._college||"Institute not available")}${deriveCollegeState(x)?` · ${esc(deriveCollegeState(x))}`:""}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p>
-      <div class="rank-metrics">
-        <div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div>
-        <div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div>
-        <div class="metric"><small>Historical buffer</small><strong class="buffer">${buffer>=0?"+":""}${fmt(buffer)}</strong></div>
-        <div class="metric"><small>Observed allotments</small><strong>${fmt(x.allotment_count)}</strong></div>
-      </div>
-    </article>`;
-  }).join("");
+  if(!rows.length){grid.innerHTML=`<div class="rank-item"><h4>No matching historical range found</h4><p>Try removing the specialty, college, state or category filter, or choose another round.</p></div>`;return;}
+  grid.innerHTML=rows.map(x=>{const close=Number(x.closing_rank),buffer=close-air;return `<article class="rank-item"><span class="tag">${buffer>=0?"HISTORICALLY REACHABLE":"NEAR RANGE"}</span><h4>${esc(x._course||"Course not available")}</h4><p>${esc(x._college||"Institute not available")}${deriveCollegeState(x)?` · ${esc(deriveCollegeState(x))}`:""}${x.category_clean&&x.category_clean!=="OTHER"?` · ${esc(x.category_clean)}`:""}</p><div class="rank-metrics"><div class="metric"><small>Your AIR</small><strong>${fmt(air)}</strong></div><div class="metric"><small>Observed closing AIR</small><strong>${fmt(close)}</strong></div><div class="metric"><small>Historical buffer</small><strong class="buffer">${buffer>=0?"+":""}${fmt(buffer)}</strong></div><div class="metric"><small>Observed allotments</small><strong>${fmt(x.allotment_count)}</strong></div></div></article>`;}).join("");
 }
 
-function runExplore(){
-  trackEvent("explore_search", {
-    counselling: state.counselling, round: state.round,
-    college: document.getElementById("searchCollege").value.trim(),
-    course: document.getElementById("searchCourse").value.trim(),
-    max_air: Number(document.getElementById("searchMaxAir").value)||0
-  });
-  const college=norm(document.getElementById("searchCollege").value);
+async function runExplore(){
+  const ok=state.loaded || await loadCurrentRound(); if(!ok) return;
+  trackEvent("explore_search", {counselling: state.counselling, round: state.round, college: document.getElementById("searchCollege").value.trim(), course: document.getElementById("searchCourse").value.trim(), max_air: Number(document.getElementById("searchMaxAir").value)||0});
+  const college=document.getElementById("searchCollege").value.trim();
   const course=norm(document.getElementById("searchCourse").value);
   const maxAir=Number(document.getElementById("searchMaxAir").value)||Infinity;
   let rows=currentAllotments().filter(x=>Number(x.rank_value)<=maxAir);
   if(college) rows=rows.filter(x=>collegeMatches(x,college));
-  if(course) rows=rows.filter(x=>norm(x._course||"").includes(course));
-  rows.sort((a,b)=>Number(a.rank_value)-Number(b.rank_value));
-  rows=rows.slice(0,250);
+  if(course) rows=rows.filter(x=>norm(x._course||canonicalCourse(x.course,x.category,x.college)||"").includes(course));
+  rows.sort((a,b)=>Number(a.rank_value)-Number(b.rank_value)); rows=rows.slice(0,250);
   document.getElementById("exploreMeta").textContent=`${fmt(rows.length)} records shown · max 250`;
-  document.getElementById("exploreBody").innerHTML=rows.length?rows.map(x=>`<tr>
-    <td>${fmt(x.rank_value)}</td><td>${esc(x._college||"—")}</td><td>${esc(x._course||"—")}</td>
-    <td>${esc(x.category)}</td><td>${esc(x.quota)}</td><td>${esc(x.seat_type)}</td>
-  </tr>`).join(""):`<tr><td colspan="6">No records found for the selected filters.</td></tr>`;
+  document.getElementById("exploreBody").innerHTML=rows.length?rows.map(x=>`<tr><td>${fmt(x.rank_value)}</td><td>${esc(displayCollege(x)||"—")}</td><td>${esc(x._course||canonicalCourse(x.course,x.category,x.college)||"—")}</td><td>${esc(x.category||"—")}</td><td>${esc(x.quota||"—")}</td><td>${esc(x.seat_type||"—")}</td></tr>`).join(""): `<tr><td colspan="6">No records found for the selected filters.</td></tr>`;
 }
+
 function clearExplore(){
   document.getElementById("exploreMeta").textContent="Search to view records";
   document.getElementById("exploreBody").innerHTML=`<tr><td colspan="6">Enter a college, specialty or AIR limit and search.</td></tr>`;
 }
 
-function buildMovementRows(){
-  const grouped=new Map();
-  for(const x of (state.movementAllotments || state.allotments)){
-    const college=x._college, course=x._course, round=String(x.round||'').toUpperCase(), rank=Number(x.rank_value);
-    if(!college || !course || !/^R[123]$|^STRAY$/.test(round) || !Number.isFinite(rank) || rank<=0) continue;
-    const key=`${norm(college)}|${norm(course)}|${round}`;
-    let g=grouped.get(key);
-    if(!g) g={_college:college,_course:course,_collegeSearch:norm(college),round};
-    g.minRank=g.minRank==null?rank:Math.min(g.minRank,rank);
-    g.maxRank=g.maxRank==null?rank:Math.max(g.maxRank,rank);
-    g.count=(g.count||0)+1;
-    grouped.set(key,g);
-  }
-  const merged=new Map();
-  for(const g of grouped.values()){
-    const key=`${norm(g._college)}|${norm(g._course)}`;
-    const out=merged.get(key)||{_college:g._college,_course:g._course,_collegeSearch:g._collegeSearch};
-    out[`opening_rank_${g.round}`]=g.minRank;
-    out[`closing_rank_${g.round}`]=g.maxRank;
-    out[`allotment_count_${g.round}`]=g.count;
-    merged.set(key,out);
-  }
-  return [...merged.values()];
+function movementCollegeMatches(raw, selected){
+  return selectedCollegeMatchesRaw(raw, selected);
 }
 
 async function runMovement(){
-  trackEvent('movement_search', {
-    counselling: state.counselling,
-    round: state.round,
-    college: document.getElementById('moveCollege').value.trim(),
-    course: document.getElementById('moveCourse').value.trim()
-  });
-
-  const selectedCollege=norm(document.getElementById('moveCollege').value);
+  trackEvent('movement_search',{counselling:state.counselling,round:state.round,college:document.getElementById('moveCollege').value.trim(),course:document.getElementById('moveCourse').value.trim()});
+  const selectedCollege=document.getElementById('moveCollege').value.trim();
   const selectedCourse=norm(document.getElementById('moveCourse').value);
-  document.getElementById('moveSearch').disabled=true;
+  const button=document.getElementById('moveSearch'); button.disabled=true;
+  document.getElementById('movementEmpty').hidden=false;
+  document.getElementById('movementResults').hidden=true;
   document.getElementById('movementEmpty').textContent='Loading movement data…';
-  let rows=[];
-  try {
-    await ensureMovementData();
-    rows=buildMovementRows();
-  } catch(err) {
-    console.error(err);
-    document.getElementById('movementEmpty').hidden=false;
-    document.getElementById('movementResults').hidden=true;
-    document.getElementById('movementEmpty').textContent='Could not load movement data. Please try again.';
-    return;
-  } finally {
-    document.getElementById('moveSearch').disabled=false;
-  }
-
-  if(selectedCollege){
-    rows=rows.filter(x=>collegeMatches(x,selectedCollege));
-  }
-  if(selectedCourse){
-    rows=rows.filter(x=>norm(x._course)===selectedCourse);
-  }
-
-  // Merge exact cleaned college+course pairs from multiple movement rows.
-  const merged=new Map();
-  for(const x of rows){
-    const key=`${norm(x._college)}|${norm(x._course)}`;
-    const g=merged.get(key)||{_college:x._college,_course:x._course,_collegeSearch:x._collegeSearch};
-    for(const r of ['R1','R2','R3','STRAY']){
-      if(x[`allotment_count_${r}`]) g[`allotment_count_${r}`]=(g[`allotment_count_${r}`]||0)+x[`allotment_count_${r}`];
-      if(Number.isFinite(x[`opening_rank_${r}`])) g[`opening_rank_${r}`]=g[`opening_rank_${r}`]==null?x[`opening_rank_${r}`]:Math.min(g[`opening_rank_${r}`],x[`opening_rank_${r}`]);
-      if(Number.isFinite(x[`closing_rank_${r}`])) g[`closing_rank_${r}`]=g[`closing_rank_${r}`]==null?x[`closing_rank_${r}`]:Math.max(g[`closing_rank_${r}`],x[`closing_rank_${r}`]);
-    }
-    merged.set(key,g);
-  }
-
-  rows=[...merged.values()];
-  if(!rows.length){
-    document.getElementById('movementResults').hidden=true;
-    document.getElementById('movementEmpty').hidden=false;
-    document.getElementById('movementEmpty').textContent='No matching historical movement found. Try selecting a clean college name and course.';
-    return;
-  }
-
-  // Prefer an exact college+course hit. If only a college is supplied, list the
-  // first matching course rather than silently mixing several courses.
-  rows.sort((a,b)=>{
-    const ea=(selectedCollege && norm(a._college)===selectedCollege?0:1)+(selectedCourse && norm(a._course)===selectedCourse?0:1);
-    const eb=(selectedCollege && norm(b._college)===selectedCollege?0:1)+(selectedCourse && norm(b._course)===selectedCourse?0:1);
-    return ea-eb || a._college.localeCompare(b._college,'en',{sensitivity:'base'}) || a._course.localeCompare(b._course,'en',{sensitivity:'base'});
-  });
-
-  const x=rows[0];
-  document.getElementById('movementEmpty').hidden=true;
-  document.getElementById('movementResults').hidden=false;
-  document.getElementById('movementTitle').textContent=`${x._college||'Institute not available'} · ${x._course||'Course not available'}`;
-  const rounds=[['R1','Round 1'],['R2','Round 2'],['R3','Round 3'],['STRAY','Stray']];
-  document.getElementById('movementRow').innerHTML=rounds.map(([r,label])=>{
-    const o=x[`opening_rank_${r}`], c=x[`closing_rank_${r}`];
-    const has=Number.isFinite(o)&&Number.isFinite(c);
-    return `<div class="move-box"><small>${label}</small><strong>${has?`${fmt(o)} – ${fmt(c)}`:'—'}</strong><span>${x[`allotment_count_${r}`]?fmt(x[`allotment_count_${r}`])+' allotments':'No observed data'}</span></div>`;
-  }).join('');
+  try{
+    const rows=await ensureMovementData();
+    const matches=rows.filter(x=>{
+      const rawCollege=String(x.college||'');
+      const c=norm(x.course||'');
+      if(selectedCollege && !movementCollegeMatches(rawCollege,selectedCollege)) return false;
+      if(selectedCourse && c!==selectedCourse && !c.includes(selectedCourse)) return false;
+      return true;
+    });
+    if(!matches.length){document.getElementById('movementEmpty').textContent='No matching historical movement found. Try selecting a clean college name and course.';return;}
+    // Use the user's clean selected college name where supplied; otherwise clean the source field.
+    const m=matches[0];
+    const titleCollege=selectedCollege||cleanCollegeName(m.college)||String(m.college||'').split(',')[0];
+    const titleCourse=document.getElementById('moveCourse').value.trim() || canonicalCourse(m.course) || m.course || 'Course not available';
+    document.getElementById('movementTitle').textContent=`${titleCollege} · ${titleCourse}`;
+    const boxes=[['R1','Round 1'],['R2','Round 2'],['R3','Round 3'],['STRAY','Stray']];
+    document.getElementById('movementRow').innerHTML=boxes.map(([r,label])=>{
+      const o=Number(m['opening_rank_'+r]), c=Number(m['closing_rank_'+r]), n=Number(m['allotment_count_'+r]);
+      const has=Number.isFinite(o)&&o>0&&Number.isFinite(c)&&c>0;
+      return `<div class="move-box"><small>${label}</small><strong>${has?`${fmt(o)} – ${fmt(c)}`:'—'}</strong><span>${Number.isFinite(n)&&n>0?fmt(n)+' allotments':'No observed data'}</span></div>`;
+    }).join('');
+    document.getElementById('movementEmpty').hidden=true;
+    document.getElementById('movementResults').hidden=false;
+  }catch(err){
+    console.error(err); document.getElementById('movementEmpty').textContent='Could not load movement data. Please try again.';
+  }finally{button.disabled=false;}
 }
 
 function esc(s){
   return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
 
-document.getElementById("counselling").addEventListener("change",async e=>{
-  state.counselling=e.target.value; state.round="R1";
+document.getElementById("counselling").addEventListener("change",e=>{
+  state.counselling=e.target.value; state.round="R1"; state.loaded=false; state.allotments=[]; state.movementAllotments=null;
   trackEvent("counselling_change", {counselling: state.counselling});
-  await loadDataset();
+  loadDataset();
 });
-document.getElementById("round").addEventListener("change",async e=>{
-  state.round=e.target.value;
+document.getElementById("round").addEventListener("change",e=>{
+  state.round=e.target.value; state.loaded=false; state.allotments=[];
   trackEvent("round_change", {counselling: state.counselling, round: state.round});
-  if(hasFastDataset()) await loadCurrentRound();
-  else {
-    populateRankStateOptions();
-    populateRankCourseOptions();
-    populateCollegeOptions();
-    populateCourseDatalist();
-    document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
-    clearExplore();
-  }
+  document.getElementById("rankDataStatus").textContent="Ready — search to load this round";
+  document.getElementById("exploreStatus").textContent=`${PATHS[state.counselling].label} · ${roundLabel(state.round)}`;
+  clearExplore();
 });
 document.getElementById("rankState").addEventListener("change",()=>{});
 document.getElementById("rankCategory").addEventListener("change",()=>{});
