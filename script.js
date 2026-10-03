@@ -201,11 +201,32 @@ function prepareStaticCourseUI(){
   if(courses.includes(prev)) sel.value=prev;
 }
 
+function prepareStaticMovementCourseUI(){
+  const sel=document.getElementById("moveCourse");
+  if(!sel) return;
+  const courses=[
+    "MD - General Medicine","MS - General Surgery","MD - Anaesthesiology","MD - Paediatrics",
+    "MS - Orthopaedics","MD - Radio Diagnosis / Radiology","MS - Obstetrics & Gynaecology",
+    "MS - Ophthalmology","MS - ENT","MD - Pathology","MD - Microbiology","MD - Pharmacology",
+    "MD - Physiology","MD - Psychiatry","MD - Community Medicine","MD - Forensic Medicine",
+    "MD - Anatomy","MD - Biochemistry","MD - Dermatology","MD - Emergency Medicine",
+    "MD - Radiotherapy","MD - Physical Medicine & Rehabilitation",
+    "Diploma - Anaesthesiology","Diploma - Paediatrics","Diploma - Ophthalmology","Diploma - ENT",
+    "Diploma - Pathology","Diploma - Radio Diagnosis","Diploma - Obstetrics & Gynaecology","Diploma - Dermatology",
+    "Diploma - Orthopaedics","Diploma - Psychiatry","Diploma - Community Medicine","Diploma - Forensic Medicine",
+    "Diploma - Microbiology","Diploma - Pharmacology"
+  ];
+  const previous=sel.value;
+  sel.innerHTML='<option value="">Select a course</option>'+courses.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  if(courses.includes(previous)) sel.value=previous;
+}
+
 async function loadDataset(){
   // Dataset is intentionally NOT loaded on page startup.
   // This keeps first paint instant on PC and mobile.
   prepareStaticRoundUI();
   prepareStaticCourseUI();
+  prepareStaticMovementCourseUI();
   setCategoryOptions();
   populateRankStateOptions();
   populateCollegeOptions();
@@ -3583,39 +3604,75 @@ function movementCollegeMatches(raw, selected){
 }
 
 async function runMovement(){
-  trackEvent('movement_search',{counselling:state.counselling,round:state.round,college:document.getElementById('moveCollege').value.trim(),course:document.getElementById('moveCourse').value.trim()});
-  const selectedCollege=document.getElementById('moveCollege').value.trim();
-  const selectedCourse=norm(document.getElementById('moveCourse').value);
-  const button=document.getElementById('moveSearch'); button.disabled=true;
+  const collegeInput=document.getElementById('moveCollege');
+  const courseInput=document.getElementById('moveCourse');
+  const selectedCollege=collegeInput?.value?.trim() || '';
+  const selectedCourse=courseInput?.value?.trim() || '';
+  trackEvent('movement_search',{counselling:state.counselling,round:state.round,college:selectedCollege,course:selectedCourse});
+
+  const button=document.getElementById('moveSearch');
+  button.disabled=true;
   document.getElementById('movementEmpty').hidden=false;
   document.getElementById('movementResults').hidden=true;
   document.getElementById('movementEmpty').textContent='Loading movement data…';
+
   try{
     const rows=await ensureMovementData();
+    const selectedCollegeNorm=norm(selectedCollege);
+    const selectedCourseNorm=norm(selectedCourse);
+
     const matches=rows.filter(x=>{
       const rawCollege=String(x.college||'');
-      const c=norm(x.course||'');
-      if(selectedCollege && !movementCollegeMatches(rawCollege,selectedCollege)) return false;
-      if(selectedCourse && c!==selectedCourse && !c.includes(selectedCourse)) return false;
-      return true;
+      const cleanCollege=canonicalCollegeName(rawCollege, cleanCollegeName(rawCollege));
+      const rawCourse=String(x.course||'');
+      const cleanCourse=canonicalCourse(rawCourse, x.category, rawCollege) || cleanCollegeName(rawCourse);
+      
+      let collegeOK=true;
+      if(selectedCollegeNorm){
+        const rowCollegeNorm=norm(cleanCollege || cleanCollegeName(rawCollege));
+        collegeOK = rowCollegeNorm===selectedCollegeNorm || selectedCollegeMatchesRaw(rawCollege, selectedCollege) || (rowCollegeNorm && (rowCollegeNorm.includes(selectedCollegeNorm) || selectedCollegeNorm.includes(rowCollegeNorm)));
+      }
+
+      let courseOK=true;
+      if(selectedCourseNorm){
+        const rowCourseNorm=norm(cleanCourse);
+        courseOK = rowCourseNorm===selectedCourseNorm || rowCourseNorm.includes(selectedCourseNorm) || selectedCourseNorm.includes(rowCourseNorm);
+      }
+
+      return collegeOK && courseOK;
     });
-    if(!matches.length){document.getElementById('movementEmpty').textContent='No matching historical movement found. Try selecting a clean college name and course.';return;}
-    // Use the user's clean selected college name where supplied; otherwise clean the source field.
-    const m=matches[0];
-    const titleCollege=selectedCollege||cleanCollegeName(m.college)||String(m.college||'').split(',')[0];
-    const titleCourse=document.getElementById('moveCourse').value.trim() || canonicalCourse(m.course) || m.course || 'Course not available';
+
+    if(!matches.length){
+      document.getElementById('movementEmpty').textContent='No matching historical movement found. Try another course or college.';
+      return;
+    }
+
+    // Prefer an exact canonical college/course match when several source rows match.
+    const exact=matches.find(x=>{
+      const rc=norm(canonicalCollegeName(x.college, cleanCollegeName(x.college)));
+      const rr=norm(canonicalCourse(x.course,x.category,x.college)||'');
+      return (!selectedCollegeNorm || rc===selectedCollegeNorm) && (!selectedCourseNorm || rr===selectedCourseNorm);
+    });
+    const m=exact||matches[0];
+    const titleCollege=selectedCollege || canonicalCollegeName(m.college, cleanCollegeName(m.college)) || String(m.college||'').split(',')[0].trim();
+    const titleCourse=selectedCourse || canonicalCourse(m.course,m.category,m.college) || m.course || 'Course not available';
     document.getElementById('movementTitle').textContent=`${titleCollege} · ${titleCourse}`;
+
     const boxes=[['R1','Round 1'],['R2','Round 2'],['R3','Round 3'],['STRAY','Stray']];
     document.getElementById('movementRow').innerHTML=boxes.map(([r,label])=>{
       const o=Number(m['opening_rank_'+r]), c=Number(m['closing_rank_'+r]), n=Number(m['allotment_count_'+r]);
       const has=Number.isFinite(o)&&o>0&&Number.isFinite(c)&&c>0;
       return `<div class="move-box"><small>${label}</small><strong>${has?`${fmt(o)} – ${fmt(c)}`:'—'}</strong><span>${Number.isFinite(n)&&n>0?fmt(n)+' allotments':'No observed data'}</span></div>`;
     }).join('');
+
     document.getElementById('movementEmpty').hidden=true;
     document.getElementById('movementResults').hidden=false;
   }catch(err){
-    console.error(err); document.getElementById('movementEmpty').textContent='Could not load movement data. Please try again.';
-  }finally{button.disabled=false;}
+    console.error(err);
+    document.getElementById('movementEmpty').textContent='Could not load movement data. Please try again.';
+  }finally{
+    button.disabled=false;
+  }
 }
 
 function esc(s){

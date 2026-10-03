@@ -202,7 +202,7 @@
   <div class="movement-card">
     <div class="movement-controls">
       <label><span>College / Institute</span><div class="autocomplete-host"><input id="moveCollege" autocomplete="off" spellcheck="false" placeholder="Start typing a college"><div id="moveCollegeMenu" class="autocomplete-menu" hidden></div></div></label>
-      <label><span>Course</span><input id="moveCourse" list="courseOptions" placeholder="Start typing a course"></label>
+      <label><span>Course</span><select id="moveCourse" aria-label="Course"><option value="">Select a course</option></select></label>
       <button id="moveSearch" class="secondary">Show movement</button>
     </div>
     <div id="movementEmpty" class="movement-empty">Enter a college or course to compare observed opening and closing AIR across rounds.</div>
@@ -286,6 +286,6 @@
 </main>
 
 <footer>SeatMentor · 2025 counselling intelligence · Historical data explorer</footer>
-<script src="script.js?v=33"></script>
+<script src="script.js?v=35"></script>
 </body>
 </html>
